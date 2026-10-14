@@ -713,3 +713,20 @@ body:not(.admin-body) a {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* iOS keyboard recovery: restore native touch and text-editing behavior on every buyer form field. */
+html, body { -webkit-text-size-adjust: 100%; }
+input, textarea, select, [contenteditable="true"] {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-user-modify: read-write !important;
+  caret-color: #1d1d1f !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {
+  font-size: 16px !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
