@@ -9,6 +9,10 @@
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/seller",
+      "destination": "/admin.html"
     }
   ]
 }

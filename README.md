@@ -3,7 +3,7 @@
 Ser mart is a minimalist storefront and seller dashboard built with HTML, CSS, JavaScript, and a Rust/Axum backend.
 
 - Storefront: `/`
-- Seller dashboard: `/admin` (password required; default for this deployment is configured as `password1`)
+- Seller dashboard: `/seller` (also `/admin`), protected by the `ADMIN_PASSWORD` environment variable
 - Health check: `/api/health`
 
 ## Render
