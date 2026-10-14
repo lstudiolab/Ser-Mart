@@ -586,3 +586,7 @@ button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-p
  .admin-form-wrap .admin-editor{contain:none!important}
  .admin-form-wrap{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 }
+
+/* The product description is a real native textarea, not contenteditable. */
+#product-description[name="description"]{display:block!important;width:100%!important;min-height:148px!important;padding:13px 14px!important;position:relative!important;z-index:5!important;border:1px solid #d2d2d7!important;border-radius:14px!important;background:#fff!important;color:#202024!important;font:inherit!important;font-size:16px!important;line-height:1.5!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;touch-action:manipulation!important;user-select:text!important;-webkit-user-select:text!important;-webkit-appearance:none!important;appearance:none!important;resize:vertical!important;outline:none!important}
+#product-description[name="description"]:focus{border-color:#a1a1aa!important;box-shadow:0 0 0 2px #88888812!important}
