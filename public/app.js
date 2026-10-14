@@ -62,7 +62,7 @@ const cancel=e.target.closest('[data-cancel]');if(cancel){const ref=state.refs.f
 document.addEventListener('input',e=>{if(e.target.id==='search-input'){state.search=e.target.value;const list=state.products.filter(p=>p.name.toLowerCase().includes(state.search.toLowerCase())),count=$('.result-count'),target=$('#product-results');if(count)count.textContent=list.length+(list.length===1?' item':' items');if(target)target.innerHTML=grid(list);}});
 document.addEventListener('click',e=>{if(e.target.closest('#clear-search')){state.search='';renderSearch();$('#search-input').focus();}});
 document.addEventListener('submit',async e=>{
-if(e.target.id==='profile-form'){e.preventDefault();const f=new FormData(e.target);state.profile={name:f.get('name'),phone:f.get('phone'),address:f.get('address'),exactPlace:f.get('exactPlace')};save('ser-mart-profile',state.profile);notice('Your details have been saved.');render();return;}
+if(e.target.id==='profile-form'){e.preventDefault();const f=new FormData(e.target);state.profile={name:f.get('name'),phone:f.get('phone'),address:f.get('address'),exactPlace:f.get('exactPlace')};notice('Your details have been saved.');render();return;}
 if(e.target.id==='checkout-form'){e.preventDefault();await submitOrder(e.target);return;}
 const form=e.target.closest('[data-message-form]');if(form){e.preventDefault();const id=Number(form.dataset.messageForm),ref=state.refs.find(r=>Number(r.id)===id),input=form.querySelector('input[name="text"]');if(!ref||!input.value.trim())return;try{await api('/api/orders/'+id+'/messages',{method:'POST',headers:{Authorization:'Bearer '+ref.token},body:JSON.stringify({text:input.value.trim()})});await loadOrders();render();notice('Message sent.');}catch(err){notice(err.message);}}
 });
