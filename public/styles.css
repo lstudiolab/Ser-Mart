@@ -562,3 +562,27 @@ button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-p
   .admin-form-wrap textarea[name="description"]{display:block!important;position:relative!important;z-index:3!important;width:100%!important;min-height:132px!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important;-webkit-appearance:none!important;appearance:none!important;font-size:16px!important;line-height:1.45!important;outline:none}
   .category-admin-create textarea,.category-admin-fields textarea{font-size:16px!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important}
 }
+
+/* Contenteditable product information uses native iOS text input and multiline selection. */
+.description-editable{display:block;width:100%;min-height:132px;padding:12px 14px;border:1px solid #d2d2d7;border-radius:13px;background:#fff;color:#202024;font:inherit;font-size:16px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text;-webkit-user-modify:read-write-plaintext-only;touch-action:auto;pointer-events:auto;cursor:text;outline:none}
+.description-editable:focus{border-color:#a1a1aa;box-shadow:0 0 0 2px #88888812}
+.description-editable:empty:before{content:"Tell customers about this item";color:#8e8e93;pointer-events:none}
+.category-image-wrap{display:block;width:100%;height:100px;overflow:hidden;margin-bottom:2px;border-radius:16px;background:#f1f1f5}
+.category-tile-image{width:100%;height:100%;display:block;object-fit:cover}
+.category-card{overflow:hidden}
+.category-card .category-name{max-width:100%;overflow-wrap:anywhere}
+.category-card .category-hint{color:#85858b}
+.category-empty-state{margin:12px 0 24px;padding:22px 18px;border-radius:20px;background:transparent;color:#77777e;font-size:13px;line-height:1.5}
+.home-products-heading{margin-top:8px;align-items:center}
+.explore-products{background:transparent!important;border:0!important;color:var(--ink)!important;padding:0!important;box-shadow:none!important;border-radius:0!important}
+.explore-products svg{color:currentColor}
+.new-arrival-open{display:block;width:100%;border:0;padding:0;background:transparent;color:inherit;text-align:left}
+.new-arrival-open .new-arrival-photo,.new-arrival-open .new-arrival-copy{display:block}
+.new-arrival-open .new-arrival-copy{background:linear-gradient(to bottom,rgba(255,255,255,.78),#fff 24%)}
+.new-arrival-open .new-arrival-bottom{display:flex}
+.new-arrival-link{display:inline-flex;align-items:center;gap:7px}
+@media(max-width:760px){
+ .description-editable{font-size:16px!important;min-height:140px;line-height:1.5;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important}
+ .admin-form-wrap .admin-editor{contain:none!important}
+ .admin-form-wrap{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+}
