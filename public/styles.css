@@ -301,3 +301,36 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* Keyboard-safe checkout and refined, restrained motion */
+:root{--keyboard-height:0px}
+html{scroll-padding-top:18px;scroll-padding-bottom:calc(100px + var(--safe-bottom) + var(--keyboard-height))}
+body.checkout-active{min-height:100%;padding-bottom:calc(104px + var(--safe-bottom) + var(--keyboard-height));}
+body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keyboard-height))}
+.checkout-active .main-view{padding-bottom:calc(110px + var(--keyboard-height) + var(--safe-bottom))}
+.checkout-order-bar{bottom:calc(10px + var(--safe-bottom) + var(--keyboard-height));transition:bottom .18s ease,transform .22s ease,opacity .22s ease}
+.checkout-active .form-panel input:not([type=radio]),
+.checkout-active .form-panel textarea{scroll-margin-block:24px;scroll-margin-bottom:calc(30px + var(--keyboard-height))}
+.form-panel input:not([type=radio]),.form-panel textarea{font-size:16px;line-height:1.4}
+.main-view>section,.main-view>.product-grid,.main-view>.orders-list,.main-view>.cart-layout,.main-view>.checkout-layout,.main-view>.form-panel,.main-view>.empty-state{animation:content-enter .34s cubic-bezier(.2,.75,.25,1) both}
+.product-card{animation:card-enter .38s cubic-bezier(.2,.75,.25,1) both}
+.product-card:nth-child(2){animation-delay:25ms}.product-card:nth-child(3){animation-delay:50ms}.product-card:nth-child(4){animation-delay:75ms}
+.product-card:nth-child(5){animation-delay:100ms}.product-card:nth-child(6){animation-delay:125ms}.product-card:nth-child(7){animation-delay:150ms}.product-card:nth-child(8){animation-delay:175ms}
+.primary-button:active,.secondary-button:active,.icon-button:active,.nav-item:active,.choice-option:active{transform:scale(.975)}
+.detail-screen{animation:content-enter .3s cubic-bezier(.2,.75,.25,1) both}
+.selection-sheet{animation:sheet-up .28s cubic-bezier(.2,.8,.2,1) both}
+.sheet-backdrop{animation:fade-in .2s ease both}
+.toast{transition:opacity .22s ease,transform .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes content-enter{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes card-enter{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:760px){
+  .checkout-active .main-view{width:calc(100% - 32px);padding-top:8px}
+  .checkout-active .checkout-heading{padding-bottom:0}
+  .checkout-active .checkout-layout{padding-bottom:calc(90px + var(--keyboard-height))}
+  .checkout-order-bar{left:50%;transform:translateX(-50%);will-change:bottom}
+  body.checkout-active.keyboard-open .checkout-order-bar{bottom:calc(var(--keyboard-height) + 8px);box-shadow:0 4px 18px #00000010}
+}
+@media(prefers-reduced-motion:reduce){
+  .main-view>section,.main-view>.product-grid,.main-view>.orders-list,.main-view>.cart-layout,.main-view>.checkout-layout,.main-view>.form-panel,.main-view>.empty-state,.product-card,.detail-screen,.selection-sheet,.sheet-backdrop{animation:none!important}
+  .checkout-order-bar,.toast{transition:none!important}
+}
