@@ -1,3 +1,5 @@
+use argon2::{Argon2, PasswordHasher, PasswordVerifier, password_hash::{PasswordHash, SaltString}};
+use rand_core::OsRng;
 use axum::{
     body::Body, extract::{DefaultBodyLimit, Path, Query, State}, http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Request},
     middleware::{self, Next}, response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
@@ -10,7 +12,7 @@ use tower_http::{services::ServeDir, trace::TraceLayer};
 use uuid::Uuid;
 
 #[derive(Clone)]
-struct AppState { pool: AnyPool, sessions: Arc<Mutex<HashMap<String, u64>>>, login_attempts: Arc<Mutex<HashMap<String, (u32, u64)>>> }
+struct AppState { pool: AnyPool, sessions: Arc<Mutex<HashMap<String, u64>>>, customer_sessions: Arc<Mutex<HashMap<String, (i64, u64)>>>, login_attempts: Arc<Mutex<HashMap<String, (u32, u64)>>> }
 #[derive(Debug)]
 struct ApiError(StatusCode, String);
 impl ApiError {
@@ -25,6 +27,8 @@ impl IntoResponse for ApiError {
 }
 #[derive(Deserialize)]
 struct Login { password: String }
+#[derive(Deserialize)]
+struct CustomerAuth { email: String, password: String, #[serde(default)] name: String }
 #[derive(Deserialize)]
 struct ProductInput {
     name: String, #[serde(default)] description: String, price: f64, #[serde(default)] stock: i64,
@@ -85,6 +89,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         )"),
         format!("CREATE TABLE IF NOT EXISTS ser_mart_categories (id {id}, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '', image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)"),
         "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_customers (id {id}, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL)"),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
     ];
@@ -364,7 +369,8 @@ fn seller_info_json(r:&sqlx::any::AnyRow)->Value { json!({"name":r.try_get::<Str
 async fn get_seller_info(State(s):State<AppState>)->Result<Json<Value>,ApiError>{let row=sqlx::query("SELECT name,phone,gcash_number,gcash_name,pickup_address FROM ser_mart_seller_profile WHERE id=1").fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;Ok(Json(row.map(|r|seller_info_json(&r)).unwrap_or(json!({"name":"Ser mart","phone":"","gcashNumber":"","gcashName":"","pickupAddress":""}))))}
 async fn admin_seller_info(State(s):State<AppState>,h:HeaderMap)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}get_seller_info(State(s)).await}
 async fn update_seller_info(State(s):State<AppState>,h:HeaderMap,Json(i):Json<SellerInfoInput>)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}sqlx::query("INSERT INTO ser_mart_seller_profile (id,name,phone,gcash_number,gcash_name,pickup_address,updated_at) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,phone=excluded.phone,gcash_number=excluded.gcash_number,gcash_name=excluded.gcash_name,pickup_address=excluded.pickup_address,updated_at=excluded.updated_at").bind(i.name.trim()).bind(i.phone.trim()).bind(i.gcash_number.trim()).bind(i.gcash_name.trim()).bind(i.pickup_address.trim()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;get_seller_info(State(s)).await}
-async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
+async fn create_order(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
+    let _customer_id=customer_id(&headers,&s)?;
     if input.customer_name.trim().is_empty(){return Err(ApiError::bad("Please enter your name."));}
     if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
     if input.address.trim().is_empty(){return Err(ApiError::bad("Please enter your address."));}
@@ -392,6 +398,45 @@ async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Re
     tx.commit().await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"id":id,"accessToken":access,"status":"Pending","total":total,"createdAt":now()})))
 }
+
+async fn customer_register(State(s):State<AppState>,Json(input):Json<CustomerAuth>)->Result<Json<Value>,ApiError>{
+    let email=input.email.trim().to_lowercase(); let name=input.name.trim();
+    if !email.contains('@')||email.len()>254{return Err(ApiError::bad("Enter a valid email address."));}
+    if input.password.len()<8||input.password.len()>256{return Err(ApiError::bad("Password must be at least 8 characters."));}
+    if name.is_empty()||name.len()>120{return Err(ApiError::bad("Enter your name."));}
+    let salt=SaltString::generate(&mut OsRng);
+    let hash=Argon2::default().hash_password(input.password.as_bytes(),&salt).map_err(|_|ApiError::internal())?.to_string();
+    let row=sqlx::query("INSERT INTO ser_mart_customers (email,name,password_hash,created_at) VALUES (?,?,?,?) RETURNING id")
+      .bind(&email).bind(name).bind(hash).bind(now()).fetch_one(&s.pool).await.map_err(|e|if e.to_string().to_lowercase().contains("unique"){ApiError::bad("An account with that email already exists. Sign in instead.")}else{ApiError::internal()})?;
+    let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
+    customer_session(&s,id,&email,name)
+}
+async fn customer_login(State(s):State<AppState>,Json(input):Json<CustomerAuth>)->Result<Json<Value>,ApiError>{
+    let email=input.email.trim().to_lowercase();
+    let row=sqlx::query("SELECT id,name,password_hash FROM ser_mart_customers WHERE email=?").bind(&email).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError(StatusCode::UNAUTHORIZED,"Email or password is incorrect.".into()))?;
+    let hash:String=row.try_get("password_hash").map_err(|_|ApiError::internal())?;
+    let parsed=PasswordHash::new(&hash).map_err(|_|ApiError::internal())?;
+    if Argon2::default().verify_password(input.password.as_bytes(),&parsed).is_err(){return Err(ApiError(StatusCode::UNAUTHORIZED,"Email or password is incorrect.".into()));}
+    let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?; let name:String=row.try_get("name").map_err(|_|ApiError::internal())?;
+    customer_session(&s,id,&email,&name)
+}
+fn customer_session(s:&AppState,id:i64,email:&str,name:&str)->Result<Json<Value>,ApiError>{
+    let token=Uuid::new_v4().to_string(); let expiry=epoch()+30*24*60*60;
+    s.customer_sessions.lock().map_err(|_|ApiError::internal())?.insert(token.clone(),(id,expiry));
+    Ok(Json(json!({"token":token,"expiresIn":2592000,"customer":{"id":id,"email":email,"name":name}})))
+}
+fn customer_id(headers:&HeaderMap,s:&AppState)->Result<i64,ApiError>{
+    let token=bearer_token(headers).ok_or_else(ApiError::auth)?; let ts=epoch();
+    let mut sessions=s.customer_sessions.lock().map_err(|_|ApiError::internal())?;
+    sessions.retain(|_,(_,expiry)|*expiry>ts);
+    sessions.get(token).filter(|(_,expiry)|*expiry>ts).map(|(id,_)|*id).ok_or_else(ApiError::auth)
+}
+async fn customer_me(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
+    let id=customer_id(&headers,&s)?;
+    let row=sqlx::query("SELECT id,email,name FROM ser_mart_customers WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(ApiError::auth)?;
+    Ok(Json(json!({"customer":{"id":row.try_get::<i64,_>("id").unwrap_or_default(),"email":row.try_get::<String,_>("email").unwrap_or_default(),"name":row.try_get::<String,_>("name").unwrap_or_default()}})))
+}
+
 fn bearer_token(headers:&HeaderMap)->Option<&str>{
     headers.get(header::AUTHORIZATION).and_then(|v|v.to_str().ok()).and_then(|v|v.strip_prefix("Bearer ")).map(str::trim).filter(|v|!v.is_empty())
 }
@@ -461,10 +506,10 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let url=env::var("DATABASE_URL").unwrap_or_else(|_|"sqlite://ser-mart.db?mode=rwc".into());
     let pg=url.starts_with("postgres://")||url.starts_with("postgresql://");
     let pool=AnyPoolOptions::new().max_connections(if pg{5}else{1}).connect(&url).await?; init_db(&pool,pg).await?;
-    let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new())),login_attempts:Arc::new(Mutex::new(HashMap::new()))};
+    let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new())),customer_sessions:Arc::new(Mutex::new(HashMap::new())),login_attempts:Arc::new(Mutex::new(HashMap::new()))};
     let app=Router::new()
         .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin)).route("/seller",get(html_admin)).route("/seller/",get(html_admin))
-        .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
+        .route("/api/health",get(health)).route("/api/customer/register",post(customer_register)).route("/api/customer/login",post(customer_login)).route("/api/customer/me",get(customer_me)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
         .route("/api/admin/products/{id}",put(admin_update_product).delete(admin_delete_product))
