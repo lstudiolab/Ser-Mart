@@ -275,10 +275,16 @@ async fn my_order(State(s):State<AppState>,Query(q):Query<TokenQuery>)->Result<J
 async fn cancel_order(State(s):State<AppState>,Path(id):Path<i64>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
     let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
     let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(q.token.trim()).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
-    let status:String=row.try_get("status").unwrap_or_default(); if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
+    let status:String=row.try_get("status").unwrap_or_default();
+    if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
     let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
-    let changed=sqlx::query("UPDATE ser_mart_orders SET status='Cancelled' WHERE id=? AND status='Pending'").bind(id).execute(&mut *tx).await.map_err(|_|ApiError::internal())?; if changed.rows_affected()==0{return Err(ApiError::bad("This order has already been updated."));}
-    for item in items.as_array().cloned().unwrap_or_default(){let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=? AND is_active=1").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}}
+    let changed=sqlx::query("UPDATE ser_mart_orders SET status='Cancelled' WHERE id=? AND status='Pending'").bind(id).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;
+    if changed.rows_affected()==0{return Err(ApiError::bad("This order has already been updated."));}
+    for item in items.as_array().cloned().unwrap_or_default(){
+        let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);
+        if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=? AND is_active=1").bind(qty).bind(pid).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;}
+    }
+    tx.commit().await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"ok":true,"status":"Cancelled"})))
 }
 async fn admin_orders(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
