@@ -1,0 +1,34 @@
+name: Ser mart checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Compile release binary
+        run: cargo build --locked --release
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate storefront JavaScript
+        run: |
+          node --check public/app.js
+          node --check public/admin.js
