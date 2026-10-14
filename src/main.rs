@@ -158,7 +158,7 @@ async fn html_index() -> Response {
 async fn html_admin() -> Response {
     Response::builder().header(header::CONTENT_TYPE, "text/html; charset=utf-8").body(Body::from(include_str!("../public/admin.html"))).unwrap()
 }
-async fn health() -> Json<Value> { Json(json!({"ok":true,"name":"Ser mart"})) }
+async fn health(State(s): State<AppState>) -> Result<Json<Value>, ApiError> { sqlx::query("SELECT 1").execute(&s.pool).await.map_err(|_| ApiError::internal())?; Ok(Json(json!({"ok":true,"name":"Ser mart","database":"connected"}))) }
 
 async fn list_products(State(s): State<AppState>, Query(q): Query<SearchQuery>) -> Result<Json<Value>,ApiError> {
     let rows = sqlx::query("SELECT * FROM ser_mart_products WHERE is_active = 1 AND stock > 0 ORDER BY id DESC")
@@ -181,7 +181,7 @@ async fn get_image(State(s):State<AppState>,Path(id):Path<i64>)->Result<Response
     Ok(response)
 }
 async fn login(State(s):State<AppState>,Json(input):Json<Login>)->Result<Json<Value>,ApiError>{
-    let expected=env::var("ADMIN_PASSWORD").unwrap_or_else(|_|"password1".into());
+    let expected=env::var("ADMIN_PASSWORD").map_err(|_|ApiError::internal())?;
     if input.password != expected {return Err(ApiError(StatusCode::UNAUTHORIZED,"That password is not correct.".into()));}
     let token=Uuid::new_v4().to_string();
     let mut sessions=s.sessions.lock().map_err(|_|ApiError::internal())?;
@@ -314,7 +314,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let pool=AnyPoolOptions::new().max_connections(if pg{5}else{1}).connect(&url).await?; init_db(&pool,pg).await?;
     let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new()))};
     let app=Router::new()
-        .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin))
+        .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin)).route("/seller",get(html_admin)).route("/seller/",get(html_admin))
         .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
