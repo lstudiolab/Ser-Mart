@@ -341,3 +341,39 @@ body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keybo
 .product-card.sold-out .product-photo img{filter:saturate(.72)}
 .product-card.sold-out .product-hint{color:#8b7373}
 .sold-out-message{grid-column:1/-1;margin:0;padding:13px 16px;border-radius:14px;background:#f1f1f4;color:#696970;text-align:center;font-size:13px;font-weight:600}
+
+
+/* Product details: clearer purchase decision and item availability */
+.detail-info-grid{align-items:start;gap:clamp(28px,5vw,72px)}
+.detail-purchase-info h1{margin:12px 0 10px;font-size:clamp(32px,5vw,52px);line-height:1.04;letter-spacing:-1.9px}
+.detail-price{margin-top:8px;font-size:28px;font-weight:650;letter-spacing:-.7px}
+.detail-availability{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:13px;font-weight:550}
+.detail-availability.available{color:#24834b}.detail-availability.unavailable{color:#8b5b5b}
+.stock-dot{width:7px;height:7px;border-radius:50%;background:#2e9b59;display:inline-block}
+.detail-promise{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:19px;color:#6e6e73;font-size:12px}
+.detail-promise svg{width:15px;height:15px;color:#24834b}
+.promise-dot{color:#b2b2b8}
+.detail-description{padding:5px 0 0;border:0}
+.detail-description p{margin:11px 0 0;color:#515158;font-size:15px;line-height:1.75;white-space:pre-line}
+.detail-option-list{margin-top:24px;padding-top:18px;border-top:1px solid #e5e5ea}
+.detail-option-row{display:flex;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #e8e8ed;font-size:13px}
+.detail-option-row span:first-child{font-weight:600}.detail-option-row span:last-child{color:#6e6e73}
+.detail-info-footer{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-top:28px;padding:19px 0;border-top:1px solid #e5e5ea}
+.detail-info-footer p{margin:6px 0 0;color:#6e6e73;font-size:13px;line-height:1.5}
+.detail-price-summary{display:flex;flex-direction:column;gap:5px;min-width:115px;text-align:right}
+.detail-price-summary span{color:#6e6e73;font-size:11px}.detail-price-summary strong{font-size:18px}
+.detail-actions{position:sticky;bottom:0;z-index:5}
+@media(max-width:760px){
+ .detail-purchase-info h1{font-size:34px;letter-spacing:-1.3px}
+ .detail-price{font-size:25px}
+ .detail-info-footer{align-items:flex-start}
+ .detail-info-footer>div:first-child{max-width:65%}
+ .detail-actions{padding-bottom:calc(14px + var(--safe-bottom))}
+}
+/* iOS keyboard stability: avoid transformed form containers while fields are active */
+@media(max-width:760px){
+ .main-view>.form-panel,.main-view>.checkout-layout,.checkout-active .checkout-layout{animation:none!important;transform:none!important}
+ .form-panel,.admin-form{scroll-margin-bottom:calc(36px + var(--keyboard-height))}
+ .form-panel label,.admin-form label{scroll-margin-block:18px}
+ .form-panel input:focus,.form-panel textarea:focus,.admin-form input:focus,.admin-form textarea:focus,.admin-form select:focus{scroll-margin-block:24px}
+}
