@@ -413,3 +413,21 @@ body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keybo
  .form-panel label,.admin-form label{scroll-margin-block:18px}
  .form-panel input:focus,.form-panel textarea:focus,.admin-form input:focus,.admin-form textarea:focus,.admin-form select:focus{scroll-margin-block:24px}
 }
+
+
+/* Seller editor keyboard-safe layout */
+:root{--admin-keyboard-height:0px}
+.admin-form-wrap{padding-bottom:calc(18px + env(safe-area-inset-bottom));transition:padding-bottom .16s ease}
+.admin-editor{max-height:min(94dvh,calc(100dvh - 36px));-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-padding-block:24px}
+.admin-keyboard-open .admin-form-wrap{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.admin-keyboard-open .admin-editor{max-height:calc(100dvh - var(--admin-keyboard-height) - 12px);animation:none}
+.admin-form input,.admin-form textarea,.admin-form select{font-size:16px;scroll-margin-block:24px}
+.admin-form-wrap .admin-editor{transform:translateZ(0)}
+@media(max-width:760px){
+ .admin-form-wrap{padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+ .admin-editor{width:100%;max-height:94dvh;padding:10px 16px 22px;border-radius:27px}
+ .admin-form{grid-template-columns:1fr;gap:14px}
+ .admin-form .full-width{grid-column:auto}
+ .admin-keyboard-open .admin-form-wrap{align-items:flex-start;padding-top:6px}
+ .admin-keyboard-open .admin-editor{max-height:calc(100dvh - var(--admin-keyboard-height) - 8px);padding-bottom:calc(22px + var(--admin-keyboard-height))}
+}
