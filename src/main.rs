@@ -186,7 +186,7 @@ async fn get_image(State(s):State<AppState>,Path(id):Path<i64>)->Result<Response
     let bytes=base64::Engine::decode(&base64::engine::general_purpose::STANDARD,encoded).map_err(|_|ApiError::internal())?;
     let mut response=Response::new(Body::from(bytes));
     response.headers_mut().insert(header::CONTENT_TYPE,HeaderValue::from_str(&content_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
-    response.headers_mut().insert(header::CACHE_CONTROL,HeaderValue::from_static("public, max-age=86400"));
+    response.headers_mut().insert(header::CACHE_CONTROL,HeaderValue::from_static("no-store, max-age=0"));
     Ok(response)
 }
 async fn login(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<Login>)->Result<Json<Value>,ApiError>{
