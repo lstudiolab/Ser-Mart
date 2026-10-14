@@ -8,6 +8,31 @@ function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}}
 function readSession(k,d){try{const v=JSON.parse(sessionStorage.getItem(k));return v==null?d:v;}catch(_){return d;}}
 function saveSession(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));}catch(_){}}
 function $(s){return document.querySelector(s);}
+function syncKeyboardViewport(){
+  const vv=window.visualViewport;
+  const height=vv?Math.max(0,window.innerHeight-vv.height-vv.offsetTop):0;
+  document.documentElement.style.setProperty('--keyboard-height',Math.round(height)+'px');
+  document.body.classList.toggle('keyboard-open',height>120&&!!document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
+}
+function keepFocusedFieldVisible(el){
+  if(!el||!state.checkout||!(/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
+  const vv=window.visualViewport;
+  const delay=vv?180:80;
+  window.setTimeout(()=>{
+    if(document.activeElement!==el)return;
+    const rect=el.getBoundingClientRect();
+    const visibleBottom=vv?vv.height+vv.offsetTop:window.innerHeight;
+    if(rect.bottom>visibleBottom-24||rect.top<12)el.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  },delay);
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',syncKeyboardViewport,{passive:true});
+  window.visualViewport.addEventListener('scroll',syncKeyboardViewport,{passive:true});
+}
+window.addEventListener('resize',syncKeyboardViewport,{passive:true});
+document.addEventListener('focusin',e=>{syncKeyboardViewport();keepFocusedFieldVisible(e.target);});
+document.addEventListener('focusout',()=>window.setTimeout(syncKeyboardViewport,80));
+
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function money(v){return '₱'+Number(v||0).toLocaleString('en-PH',{maximumFractionDigits:2});}
 function svg(n){const p={arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/>',plus:'<path d="M12 5v14M5 12h14"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/>',check:'<path d="m5 12 4 4L19 6"/>',edit:'<path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5z"/><path d="m13.8 6.7 3.5 3.5"/>'};return '<svg class="inline-icon" viewBox="0 0 24 24" aria-hidden="true">'+(p[n]||p.arrow)+'</svg>';}
