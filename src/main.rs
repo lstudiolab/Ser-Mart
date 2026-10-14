@@ -247,10 +247,11 @@ async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Re
     if input.exact_place.trim().is_empty(){return Err(ApiError::bad("Please add the exact place to deliver to."));}
     if !["COD","GCash"].contains(&input.payment_method.as_str()){return Err(ApiError::bad("Choose GCash or cash on delivery."));}
     if input.items.is_empty()||input.items.len()>50{return Err(ApiError::bad("Your cart is empty or has too many items."));}
+    let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
     let mut counts:HashMap<i64,i64>=HashMap::new(); let mut snapshots=Vec::new(); let mut total=0.0_f64;
     for line in input.items {
         if line.quantity<1||line.quantity>50{return Err(ApiError::bad("Choose a valid quantity."));}
-        let row=sqlx::query("SELECT * FROM ser_mart_products WHERE id=? AND is_active=1").bind(line.product_id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::bad("One of the items is no longer available."))?;
+        let row=sqlx::query("SELECT * FROM ser_mart_products WHERE id=? AND is_active=1").bind(line.product_id).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::bad("One of the items is no longer available."))?;
         let p=product_json(&row); let count=counts.entry(line.product_id).or_insert(0); *count+=line.quantity;
         if p["stock"].as_i64().unwrap_or(0)<*count{return Err(ApiError::bad(format!("There is not enough stock for {}.",p["name"].as_str().unwrap_or("this item"))));}
         let opts=if line.selections.is_object(){line.selections}else{json!({})};
@@ -261,9 +262,10 @@ async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Re
     let access=Uuid::new_v4().to_string(); let items=serde_json::to_string(&snapshots).map_err(|_|ApiError::internal())?;
     let row=sqlx::query("INSERT INTO ser_mart_orders (customer_name,contact_number,address,exact_place,request,payment_method,items,total,status,access_token,delivery_eta,created_at) VALUES (?,?,?,?,?,?,?,?,'Pending',?,'',?) RETURNING id")
         .bind(input.customer_name.trim().to_string()).bind(input.contact_number.trim().to_string()).bind(input.address.trim().to_string()).bind(input.exact_place.trim().to_string()).bind(input.request.trim().to_string()).bind(input.payment_method).bind(items).bind(total).bind(access.clone()).bind(now())
-        .fetch_one(&s.pool).await.map_err(|_|ApiError::internal())?;
+        .fetch_one(&mut *tx).await.map_err(|_|ApiError::internal())?;
     let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
-    for (pid,qty) in counts {sqlx::query("UPDATE ser_mart_products SET stock=stock-? WHERE id=?").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}
+    for (pid,qty) in counts {let changed=sqlx::query("UPDATE ser_mart_products SET stock=stock-? WHERE id=? AND stock>=? AND is_active=1").bind(qty).bind(pid).bind(qty).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;if changed.rows_affected()==0{return Err(ApiError::bad("Stock changed while you were checking out. Please refresh your cart and try again."));}}
+    tx.commit().await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"id":id,"accessToken":access,"status":"Pending","total":total,"createdAt":now()})))
 }
 async fn my_order(State(s):State<AppState>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
