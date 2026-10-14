@@ -15,7 +15,7 @@ function syncKeyboardViewport(){
   document.body.classList.toggle('keyboard-open',height>120&&!!document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName));
 }
 function keepFocusedFieldVisible(el){
-  if(!el||!state.checkout||!(/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
+  if(!el||(!state.checkout&&!el.closest('#profile-form'))||!(/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;
   const vv=window.visualViewport;
   const delay=vv?180:80;
   window.setTimeout(()=>{
