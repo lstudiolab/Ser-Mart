@@ -653,3 +653,20 @@ button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-p
     user-select: text !important;
   }
 }
+
+
+/* Apple Store-inspired neutral controls and explicit option price ranges. */
+.primary-button,.secondary-button,.message-form button,.admin-chat-form button,.eta-field button,#checkout-submit,.cart-order-bar .primary-button,.checkout-order-bar .primary-button{background:#000!important;border-color:#000!important;color:#fff!important;box-shadow:none!important}
+.primary-button:hover,.secondary-button:hover,.message-form button:hover,.admin-chat-form button:hover,.eta-field button:hover{background:#262626!important;border-color:#262626!important}
+.form-panel input:focus,.form-panel textarea:focus,.admin-form input:focus,.admin-form textarea:focus,.admin-form select:focus,.search-field:focus-within{border-color:#777!important;box-shadow:0 0 0 2px #11111112!important}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline-color:#555!important}
+.selection-current-price{flex-wrap:wrap}.selection-price-range{display:block;flex-basis:100%;color:#777;font-size:12px;font-weight:500}
+.choice-option small{max-width:100%;font-size:10px;line-height:1.35;white-space:normal;color:#666}.choice-option.picked small{color:#eee}
+/* Keep all seller text fields native and directly focusable on iPhone, not just Description. */
+@media(max-width:760px){
+ #admin-overlay:has(.admin-form-wrap){position:fixed!important;inset:0!important;width:100%!important;height:auto!important;min-height:100dvh!important;z-index:1000!important;pointer-events:none!important}
+ .admin-form-wrap{position:fixed!important;inset:0!important;width:100%!important;height:auto!important;min-height:100dvh!important;display:block!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding:calc(8px + env(safe-area-inset-top)) 8px calc(28px + env(safe-area-inset-bottom))!important;pointer-events:auto!important}
+ .admin-form-wrap .admin-editor{position:relative!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;transform:none!important;animation:none!important;contain:none!important;filter:none!important;will-change:auto!important}
+ .admin-form-wrap input:not([type=file]),.admin-form-wrap textarea,.admin-form-wrap select{position:relative!important;z-index:2!important;display:block!important;width:100%!important;min-height:48px!important;font-size:16px!important;touch-action:auto!important;pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;-webkit-appearance:auto!important;appearance:auto!important}
+ .admin-form-wrap label{position:relative!important;overflow:visible!important;transform:none!important;animation:none!important}
+}
