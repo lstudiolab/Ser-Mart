@@ -170,7 +170,7 @@ async fn html_admin() -> Response {
 async fn health(State(s): State<AppState>) -> Result<Json<Value>, ApiError> { sqlx::query("SELECT 1").execute(&s.pool).await.map_err(|_| ApiError::internal())?; Ok(Json(json!({"ok":true,"name":"Ser mart","database":"connected"}))) }
 
 async fn list_products(State(s): State<AppState>, Query(q): Query<SearchQuery>) -> Result<Json<Value>,ApiError> {
-    let rows = sqlx::query("SELECT * FROM ser_mart_products WHERE is_active = 1 AND stock > 0 ORDER BY id DESC")
+    let rows = sqlx::query("SELECT * FROM ser_mart_products WHERE is_active = 1 ORDER BY id DESC")
         .fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
     let needle=q.q.trim().to_lowercase();
     Ok(Json(json!(rows.iter().map(product_json).filter(|p| needle.is_empty() || p["name"].as_str().unwrap_or("").to_lowercase().contains(&needle)).collect::<Vec<_>>())))
