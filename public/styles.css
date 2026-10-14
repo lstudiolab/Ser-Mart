@@ -502,3 +502,34 @@ button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-p
 @keyframes category-image-in{from{transform:scale(1.035);opacity:.65}to{transform:scale(1);opacity:1}}
 @media(max-width:600px){.product-card{flex-basis:70vw;max-width:280px}.category-profile{margin-left:-20px;margin-right:-20px}.category-profile-content{padding-left:20px;padding-right:20px}.category-profile-hero{height:clamp(390px,62vh,590px)}.category-profile-title h1{letter-spacing:-2px}}
 @media(prefers-reduced-motion:reduce){.category-profile,.category-profile-hero>img{animation:none}}
+
+
+/* iPhone Safari: keep seller inputs focusable while the on-screen keyboard opens. */
+@media(max-width:760px){
+  #admin-overlay{position:relative;z-index:40}
+  .admin-form-wrap{
+    position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-start;
+    overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    padding:calc(8px + env(safe-area-inset-top)) 8px calc(18px + env(safe-area-inset-bottom));
+    background:rgba(18,18,22,.32);
+  }
+  .admin-form-wrap .admin-editor{
+    position:relative;flex:0 0 auto;width:100%;max-height:none;min-height:0;
+    overflow:visible;transform:none!important;animation:none!important;
+    contain:none;will-change:auto;touch-action:pan-y;
+    padding:12px 16px calc(28px + env(safe-area-inset-bottom));
+  }
+  .admin-form-wrap .admin-form{
+    display:grid;grid-template-columns:minmax(0,1fr);gap:16px;
+    overflow:visible;transform:none!important;animation:none!important;
+  }
+  .admin-form-wrap input:not([type=file]),.admin-form-wrap textarea,.admin-form-wrap select{
+    display:block;width:100%;min-height:48px;font-size:16px!important;
+    line-height:1.35;touch-action:manipulation;appearance:auto;-webkit-appearance:auto;
+  }
+  .admin-form-wrap textarea{min-height:96px;resize:vertical}
+  .admin-form-wrap label{display:block;min-width:0;scroll-margin-top:24px;scroll-margin-bottom:32px}
+  .admin-form-wrap .file-pick{display:inline-flex}
+  .admin-keyboard-open .admin-form-wrap{align-items:flex-start}
+  .admin-keyboard-open .admin-form-wrap .admin-editor{max-height:none;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+}
