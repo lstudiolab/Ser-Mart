@@ -1,5 +1,5 @@
 use axum::{
-    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Request},
+    body::Body, extract::{DefaultBodyLimit, Path, Query, State}, http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Request},
     middleware::{self, Next}, response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
 };
 use serde::Deserialize;
@@ -10,7 +10,7 @@ use tower_http::{services::ServeDir, trace::TraceLayer};
 use uuid::Uuid;
 
 #[derive(Clone)]
-struct AppState { pool: AnyPool, sessions: Arc<Mutex<HashMap<String, u64>>> }
+struct AppState { pool: AnyPool, sessions: Arc<Mutex<HashMap<String, u64>>>, login_attempts: Arc<Mutex<HashMap<String, (u32, u64)>>> }
 #[derive(Debug)]
 struct ApiError(StatusCode, String);
 impl ApiError {
@@ -46,7 +46,7 @@ struct OrderInput {
 #[derive(Deserialize)]
 struct StatusInput { status: String, #[serde(default)] eta: String }
 #[derive(Deserialize)]
-struct MessageInput { #[serde(default)] token: String, text: String }
+struct MessageInput { text: String }
 #[derive(Deserialize)]
 struct SearchQuery { #[serde(default)] q: String }
 
@@ -189,9 +189,13 @@ async fn get_image(State(s):State<AppState>,Path(id):Path<i64>)->Result<Response
     response.headers_mut().insert(header::CACHE_CONTROL,HeaderValue::from_static("public, max-age=86400"));
     Ok(response)
 }
-async fn login(State(s):State<AppState>,Json(input):Json<Login>)->Result<Json<Value>,ApiError>{
+async fn login(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<Login>)->Result<Json<Value>,ApiError>{
+    let key=headers.get("x-forwarded-for").and_then(|v|v.to_str().ok()).and_then(|v|v.split(',').next()).map(str::trim).filter(|v|!v.is_empty()).unwrap_or("unknown").to_string();
+    let ts=epoch();
+    { let mut attempts=s.login_attempts.lock().map_err(|_|ApiError::internal())?; attempts.retain(|_,(_,until)|*until>ts); if let Some((count,until))=attempts.get(&key) { if *count>=8 && *until>ts { return Err(ApiError(StatusCode::TOO_MANY_REQUESTS,"Too many sign-in attempts. Please wait 15 minutes.".into())); } } }
     let expected=env::var("ADMIN_PASSWORD").map_err(|_|ApiError::internal())?;
-    if input.password != expected {return Err(ApiError(StatusCode::UNAUTHORIZED,"That password is not correct.".into()));}
+    if input.password != expected { let mut attempts=s.login_attempts.lock().map_err(|_|ApiError::internal())?; let entry=attempts.entry(key.clone()).or_insert((0,ts+900)); if entry.1<=ts { *entry=(0,ts+900); } entry.0=entry.0.saturating_add(1); return Err(ApiError(StatusCode::UNAUTHORIZED,"That password is not correct.".into())); }
+    if let Ok(mut attempts)=s.login_attempts.lock(){attempts.remove(&key);}
     let token=Uuid::new_v4().to_string();
     let mut sessions=s.sessions.lock().map_err(|_|ApiError::internal())?;
     sessions.retain(|_,expiry|*expiry>epoch()); sessions.insert(token.clone(),epoch()+8*60*60);
@@ -334,7 +338,7 @@ async fn send_message(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i
     let text=input.text.trim();if text.is_empty(){return Err(ApiError::bad("Write a message first."));}if text.len()>2000{return Err(ApiError::bad("Messages must be under 2,000 characters."));}
     let seller=admin_ok(&headers,&s);
     if seller {let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::missing("Order not found."));}}
-    else {let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(input.token.trim()).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::auth());}}
+    else {let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(token).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::auth());}}
     sqlx::query("INSERT INTO ser_mart_order_messages(order_id,sender,text,created_at) VALUES(?,?,?,?)").bind(id).bind(if seller{"seller"}else{"customer"}).bind(text.to_string()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
@@ -346,7 +350,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let url=env::var("DATABASE_URL").unwrap_or_else(|_|"sqlite://ser-mart.db?mode=rwc".into());
     let pg=url.starts_with("postgres://")||url.starts_with("postgresql://");
     let pool=AnyPoolOptions::new().max_connections(if pg{5}else{1}).connect(&url).await?; init_db(&pool,pg).await?;
-    let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new()))};
+    let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new())),login_attempts:Arc::new(Mutex::new(HashMap::new()))};
     let app=Router::new()
         .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin)).route("/seller",get(html_admin)).route("/seller/",get(html_admin))
         .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
@@ -357,7 +361,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
         .route("/api/admin/orders/{id}/status",patch(set_order_status)).route("/api/orders",post(create_order))
         .route("/api/orders/mine",get(my_order)).route("/api/orders/{id}/cancel",post(cancel_order))
         .route("/api/orders/{id}/messages",post(send_message))
-        .fallback_service(ServeDir::new("public")).layer(TraceLayer::new_for_http()).layer(middleware::from_fn(security_headers)).with_state(state);
+        .fallback_service(ServeDir::new("public")).layer(DefaultBodyLimit::max(8*1024*1024)).layer(TraceLayer::new_for_http()).layer(middleware::from_fn(security_headers)).with_state(state);
     let port:u16=env::var("PORT").ok().and_then(|v|v.parse().ok()).unwrap_or(10000);
     let addr=SocketAddr::from(([0,0,0,0],port));
     println!("Ser mart listening on {addr}; database: {}",if pg{"PostgreSQL"}else{"local SQLite (ephemeral on Render)"});
