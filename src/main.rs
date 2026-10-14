@@ -16,6 +16,7 @@ struct ApiError(StatusCode, String);
 impl ApiError {
     fn bad(s: impl Into<String>) -> Self { Self(StatusCode::BAD_REQUEST, s.into()) }
     fn auth() -> Self { Self(StatusCode::UNAUTHORIZED, "Please sign in again.".into()) }
+    fn unauthorized() -> Self { Self::auth() }
     fn missing(s: impl Into<String>) -> Self { Self(StatusCode::NOT_FOUND, s.into()) }
     fn internal() -> Self { Self(StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.".into()) }
 }
