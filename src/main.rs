@@ -1,0 +1,331 @@
+use axum::{
+    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
+};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use sqlx::{any::{install_default_drivers, AnyPoolOptions}, AnyPool, Row};
+use std::{collections::HashMap, env, net::SocketAddr, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
+use tower_http::{services::ServeDir, trace::TraceLayer};
+use uuid::Uuid;
+
+#[derive(Clone)]
+struct AppState { pool: AnyPool, sessions: Arc<Mutex<HashMap<String, u64>>> }
+#[derive(Debug)]
+struct ApiError(StatusCode, String);
+impl ApiError {
+    fn bad(s: impl Into<String>) -> Self { Self(StatusCode::BAD_REQUEST, s.into()) }
+    fn auth() -> Self { Self(StatusCode::UNAUTHORIZED, "Please sign in again.".into()) }
+    fn missing(s: impl Into<String>) -> Self { Self(StatusCode::NOT_FOUND, s.into()) }
+    fn internal() -> Self { Self(StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.".into()) }
+}
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response { (self.0, Json(json!({"error": self.1}))).into_response() }
+}
+#[derive(Deserialize)]
+struct Login { password: String }
+#[derive(Deserialize)]
+struct ProductInput {
+    name: String, #[serde(default)] description: String, price: f64, #[serde(default)] stock: i64,
+    #[serde(rename="imageUrl", default)] image_url: String, #[serde(default)] gallery: Value,
+    #[serde(default)] selections: Value, #[serde(rename="isActive", default="active_default")] is_active: bool,
+}
+fn active_default() -> bool { true }
+#[derive(Deserialize)]
+struct ImageInput { #[serde(rename="dataUrl")] data_url: String }
+#[derive(Deserialize)]
+struct CartLine { #[serde(rename="productId")] product_id: i64, quantity: i64, #[serde(default)] selections: Value }
+#[derive(Deserialize)]
+struct OrderInput {
+    #[serde(rename="customerName")] customer_name: String,
+    #[serde(rename="contactNumber", alias="phone")] contact_number: String,
+    address: String, #[serde(rename="exactPlace", default)] exact_place: String,
+    #[serde(default)] request: String, #[serde(rename="paymentMethod")] payment_method: String,
+    items: Vec<CartLine>,
+}
+#[derive(Deserialize)]
+struct StatusInput { status: String, #[serde(default)] eta: String }
+#[derive(Deserialize)]
+struct MessageInput { #[serde(default)] token: String, text: String }
+#[derive(Deserialize)]
+struct TokenQuery { token: String }
+#[derive(Deserialize)]
+struct SearchQuery { #[serde(default)] q: String }
+
+fn now() -> String { chrono::Utc::now().to_rfc3339() }
+fn epoch() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
+fn admin_ok(h: &HeaderMap, s: &AppState) -> bool {
+    let token = match h.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+        Some(v) if v.starts_with("Bearer ") => &v[7..], _ => return false,
+    };
+    let ts = epoch();
+    let mut sessions = match s.sessions.lock() { Ok(v) => v, Err(_) => return false };
+    sessions.retain(|_, expiry| *expiry > ts);
+    sessions.get(token).is_some_and(|expiry| *expiry > ts)
+}
+async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
+    let id = if pg { "BIGSERIAL PRIMARY KEY" } else { "INTEGER PRIMARY KEY AUTOINCREMENT" };
+    let sql = vec![
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_products (
+            id {id}, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            stock BIGINT NOT NULL DEFAULT 0, image_url TEXT NOT NULL DEFAULT '', gallery TEXT NOT NULL DEFAULT '[]',
+            selections TEXT NOT NULL DEFAULT '[]', is_active BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+        )"),
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_orders (
+            id {id}, customer_name TEXT NOT NULL, contact_number TEXT NOT NULL, address TEXT NOT NULL,
+            exact_place TEXT NOT NULL DEFAULT '', request TEXT NOT NULL DEFAULT '', payment_method TEXT NOT NULL,
+            items TEXT NOT NULL, total DOUBLE PRECISION NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'Pending',
+            access_token TEXT NOT NULL UNIQUE, delivery_eta TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+        )"),
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_order_messages (
+            id {id}, order_id BIGINT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL
+        )"),
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_images (
+            id {id}, image_data TEXT NOT NULL, content_type TEXT NOT NULL, created_at TEXT NOT NULL
+        )"),
+        "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
+        "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
+    ];
+    for statement in sql { sqlx::query(&statement).execute(pool).await?; }
+    Ok(())
+}
+fn parse_json(v: String, fallback: Value) -> Value { serde_json::from_str(&v).unwrap_or(fallback) }
+fn product_json(r: &sqlx::any::AnyRow) -> Value {
+    let stock: i64 = r.try_get("stock").unwrap_or_default();
+    let gallery: String = r.try_get("gallery").unwrap_or_else(|_| "[]".into());
+    let selections: String = r.try_get("selections").unwrap_or_else(|_| "[]".into());
+    let active: i64 = r.try_get("is_active").unwrap_or(1);
+    json!({
+        "id": r.try_get::<i64,_>("id").unwrap_or_default(),
+        "name": r.try_get::<String,_>("name").unwrap_or_default(),
+        "description": r.try_get::<String,_>("description").unwrap_or_default(),
+        "price": r.try_get::<f64,_>("price").unwrap_or_default(), "stock": stock,
+        "imageUrl": r.try_get::<String,_>("image_url").unwrap_or_default(),
+        "gallery": parse_json(gallery, json!([])), "selections": parse_json(selections, json!([])),
+        "isActive": active != 0, "inStock": stock > 0,
+        "createdAt": r.try_get::<String,_>("created_at").unwrap_or_default()
+    })
+}
+fn order_json(r: &sqlx::any::AnyRow) -> Value {
+    json!({
+        "id": r.try_get::<i64,_>("id").unwrap_or_default(),
+        "customerName": r.try_get::<String,_>("customer_name").unwrap_or_default(),
+        "contactNumber": r.try_get::<String,_>("contact_number").unwrap_or_default(),
+        "address": r.try_get::<String,_>("address").unwrap_or_default(),
+        "exactPlace": r.try_get::<String,_>("exact_place").unwrap_or_default(),
+        "request": r.try_get::<String,_>("request").unwrap_or_default(),
+        "paymentMethod": r.try_get::<String,_>("payment_method").unwrap_or_default(),
+        "items": parse_json(r.try_get::<String,_>("items").unwrap_or_else(|_| "[]".into()), json!([])),
+        "total": r.try_get::<f64,_>("total").unwrap_or_default(),
+        "status": r.try_get::<String,_>("status").unwrap_or_else(|_| "Pending".into()),
+        "deliveryEta": r.try_get::<String,_>("delivery_eta").unwrap_or_default(),
+        "createdAt": r.try_get::<String,_>("created_at").unwrap_or_default()
+    })
+}
+async fn with_messages(pool: &AnyPool, mut order: Value) -> Result<Value, ApiError> {
+    let id = order["id"].as_i64().unwrap_or_default();
+    let rows = sqlx::query("SELECT id, sender, text, created_at FROM ser_mart_order_messages WHERE order_id = ? ORDER BY id ASC")
+        .bind(id).fetch_all(pool).await.map_err(|_| ApiError::internal())?;
+    order["messages"] = json!(rows.iter().map(|r| json!({
+        "id": r.try_get::<i64,_>("id").unwrap_or_default(),
+        "sender": r.try_get::<String,_>("sender").unwrap_or_default(),
+        "text": r.try_get::<String,_>("text").unwrap_or_default(),
+        "createdAt": r.try_get::<String,_>("created_at").unwrap_or_default()
+    })).collect::<Vec<_>>());
+    Ok(order)
+}
+fn price_for(base: f64, groups: &Value, selected: &Value) -> Result<f64, ApiError> {
+    let mut total = base;
+    for group in groups.as_array().cloned().unwrap_or_default() {
+        let name = group.get("name").and_then(Value::as_str).unwrap_or("");
+        if name.is_empty() { continue; }
+        let choice = selected.get(name).and_then(Value::as_str).unwrap_or("");
+        let options = group.get("options").and_then(Value::as_array).cloned().unwrap_or_default();
+        let required = group.get("required").and_then(Value::as_bool).unwrap_or(true);
+        if choice.is_empty() {
+            if required && !options.is_empty() { return Err(ApiError::bad(format!("Please choose {name} for your item."))); }
+            continue;
+        }
+        let option = options.iter().find(|o| o.get("name").and_then(Value::as_str) == Some(choice))
+            .ok_or_else(|| ApiError::bad(format!("The selected {name} option is no longer available.")))?;
+        total += option.get("priceDelta").or_else(|| option.get("price_delta")).and_then(Value::as_f64).unwrap_or(0.0);
+    }
+    Ok(total.max(0.0))
+}
+async fn html_index() -> Response {
+    Response::builder().header(header::CONTENT_TYPE, "text/html; charset=utf-8").body(Body::from(include_str!("../public/index.html"))).unwrap()
+}
+async fn html_admin() -> Response {
+    Response::builder().header(header::CONTENT_TYPE, "text/html; charset=utf-8").body(Body::from(include_str!("../public/admin.html"))).unwrap()
+}
+async fn health() -> Json<Value> { Json(json!({"ok":true,"name":"Ser mart"})) }
+
+async fn list_products(State(s): State<AppState>, Query(q): Query<SearchQuery>) -> Result<Json<Value>,ApiError> {
+    let rows = sqlx::query("SELECT * FROM ser_mart_products WHERE is_active = 1 AND stock > 0 ORDER BY id DESC")
+        .fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let needle=q.q.trim().to_lowercase();
+    Ok(Json(json!(rows.iter().map(product_json).filter(|p| needle.is_empty() || p["name"].as_str().unwrap_or("").to_lowercase().contains(&needle)).collect::<Vec<_>>())))
+}
+async fn get_product(State(s):State<AppState>,Path(id):Path<i64>)->Result<Json<Value>,ApiError>{
+    let row=sqlx::query("SELECT * FROM ser_mart_products WHERE id = ? AND is_active = 1").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("This item is no longer available."))?;
+    Ok(Json(product_json(&row)))
+}
+async fn get_image(State(s):State<AppState>,Path(id):Path<i64>)->Result<Response,ApiError>{
+    let row=sqlx::query("SELECT image_data, content_type FROM ser_mart_images WHERE id = ?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Photo not found."))?;
+    let encoded:String=row.try_get("image_data").map_err(|_|ApiError::internal())?;
+    let content_type:String=row.try_get("content_type").map_err(|_|ApiError::internal())?;
+    let bytes=base64::Engine::decode(&base64::engine::general_purpose::STANDARD,encoded).map_err(|_|ApiError::internal())?;
+    let mut response=Response::new(Body::from(bytes));
+    response.headers_mut().insert(header::CONTENT_TYPE,HeaderValue::from_str(&content_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
+    response.headers_mut().insert(header::CACHE_CONTROL,HeaderValue::from_static("public, max-age=86400"));
+    Ok(response)
+}
+async fn login(State(s):State<AppState>,Json(input):Json<Login>)->Result<Json<Value>,ApiError>{
+    let expected=env::var("ADMIN_PASSWORD").unwrap_or_else(|_|"password1".into());
+    if input.password != expected {return Err(ApiError(StatusCode::UNAUTHORIZED,"That password is not correct.".into()));}
+    let token=Uuid::new_v4().to_string();
+    let mut sessions=s.sessions.lock().map_err(|_|ApiError::internal())?;
+    sessions.retain(|_,expiry|*expiry>epoch()); sessions.insert(token.clone(),epoch()+8*60*60);
+    Ok(Json(json!({"token":token,"expiresIn":28800})))
+}
+async fn admin_products(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());}
+    let rows=sqlx::query("SELECT * FROM ser_mart_products ORDER BY id DESC").fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!(rows.iter().map(product_json).collect::<Vec<_>>())))
+}
+async fn save_product(pool:&AnyPool,input:ProductInput,id:Option<i64>)->Result<Value,ApiError>{
+    let name=input.name.trim().to_string();
+    if name.is_empty(){return Err(ApiError::bad("Please enter an item name."));}
+    if !input.price.is_finite()||input.price<0.0{return Err(ApiError::bad("Enter a valid price."));}
+    if input.stock<0{return Err(ApiError::bad("Stock cannot be below zero."));}
+    let gallery=serde_json::to_string(&if input.gallery.is_array(){input.gallery}else{json!([])}).map_err(|_|ApiError::internal())?;
+    let selections=serde_json::to_string(&if input.selections.is_array(){input.selections}else{json!([])}).map_err(|_|ApiError::internal())?;
+    let active=if input.is_active{1_i64}else{0_i64};
+    let product_id=if let Some(id)=id{
+        let r=sqlx::query("UPDATE ser_mart_products SET name=?,description=?,price=?,stock=?,image_url=?,gallery=?,selections=?,is_active=? WHERE id=?")
+            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(active).bind(id)
+            .execute(pool).await.map_err(|_|ApiError::internal())?;
+        if r.rows_affected()==0{return Err(ApiError::missing("Item not found."));} id
+    }else{
+        let r=sqlx::query("INSERT INTO ser_mart_products (name,description,price,stock,image_url,gallery,selections,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?) RETURNING id")
+            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(active).bind(now())
+            .fetch_one(pool).await.map_err(|_|ApiError::internal())?;
+        r.try_get("id").map_err(|_|ApiError::internal())?
+    };
+    let row=sqlx::query("SELECT * FROM ser_mart_products WHERE id=?").bind(product_id).fetch_one(pool).await.map_err(|_|ApiError::internal())?;
+    Ok(product_json(&row))
+}
+async fn admin_create_product(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<ProductInput>)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());} Ok(Json(save_product(&s.pool,input,None).await?))
+}
+async fn admin_update_product(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>,Json(input):Json<ProductInput>)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());} Ok(Json(save_product(&s.pool,input,Some(id)).await?))
+}
+async fn admin_delete_product(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());}
+    let r=sqlx::query("UPDATE ser_mart_products SET is_active=0 WHERE id=?").bind(id).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    if r.rows_affected()==0{return Err(ApiError::missing("Item not found."));} Ok(Json(json!({"ok":true})))
+}
+async fn upload_image(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<ImageInput>)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());}
+    if input.data_url.len()>7_000_000{return Err(ApiError::bad("Each photo must be smaller than 5 MB."));}
+    let (meta,encoded)=input.data_url.split_once(',').ok_or_else(||ApiError::bad("Choose a valid photo."))?;
+    let content_type=meta.strip_prefix("data:").and_then(|v|v.split(';').next()).unwrap_or("");
+    if !["image/jpeg","image/png","image/webp","image/gif"].contains(&content_type){return Err(ApiError::bad("Use a JPG, PNG, WEBP or GIF photo."));}
+    let bytes=base64::Engine::decode(&base64::engine::general_purpose::STANDARD,encoded).map_err(|_|ApiError::bad("That photo could not be read."))?;
+    if bytes.is_empty()||bytes.len()>5*1024*1024{return Err(ApiError::bad("Each photo must be smaller than 5 MB."));}
+    let data=base64::Engine::encode(&base64::engine::general_purpose::STANDARD,bytes);
+    let row=sqlx::query("INSERT INTO ser_mart_images (image_data,content_type,created_at) VALUES (?,?,?) RETURNING id")
+        .bind(data).bind(content_type.to_string()).bind(now()).fetch_one(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
+    Ok(Json(json!({"imageUrl":format!("/api/images/{id}")})))
+}
+async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
+    if input.customer_name.trim().is_empty(){return Err(ApiError::bad("Please enter your name."));}
+    if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
+    if input.address.trim().is_empty(){return Err(ApiError::bad("Please enter your address."));}
+    if input.exact_place.trim().is_empty(){return Err(ApiError::bad("Please add the exact place to deliver to."));}
+    if !["COD","GCash"].contains(&input.payment_method.as_str()){return Err(ApiError::bad("Choose GCash or cash on delivery."));}
+    if input.items.is_empty()||input.items.len()>50{return Err(ApiError::bad("Your cart is empty or has too many items."));}
+    let mut counts:HashMap<i64,i64>=HashMap::new(); let mut snapshots=Vec::new(); let mut total=0.0_f64;
+    for line in input.items {
+        if line.quantity<1||line.quantity>50{return Err(ApiError::bad("Choose a valid quantity."));}
+        let row=sqlx::query("SELECT * FROM ser_mart_products WHERE id=? AND is_active=1").bind(line.product_id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::bad("One of the items is no longer available."))?;
+        let p=product_json(&row); let count=counts.entry(line.product_id).or_insert(0); *count+=line.quantity;
+        if p["stock"].as_i64().unwrap_or(0)<*count{return Err(ApiError::bad(format!("There is not enough stock for {}.",p["name"].as_str().unwrap_or("this item"))));}
+        let opts=if line.selections.is_object(){line.selections}else{json!({})};
+        let unit=price_for(p["price"].as_f64().unwrap_or(0.0),&p["selections"],&opts)?;
+        let subtotal=unit*line.quantity as f64;total+=subtotal;
+        snapshots.push(json!({"productId":line.product_id,"name":p["name"],"imageUrl":p["imageUrl"],"unitPrice":unit,"basePrice":p["price"],"quantity":line.quantity,"selections":opts,"subtotal":subtotal}));
+    }
+    let access=Uuid::new_v4().to_string(); let items=serde_json::to_string(&snapshots).map_err(|_|ApiError::internal())?;
+    let row=sqlx::query("INSERT INTO ser_mart_orders (customer_name,contact_number,address,exact_place,request,payment_method,items,total,status,access_token,delivery_eta,created_at) VALUES (?,?,?,?,?,?,?,?,'Pending',?,'',?) RETURNING id")
+        .bind(input.customer_name.trim().to_string()).bind(input.contact_number.trim().to_string()).bind(input.address.trim().to_string()).bind(input.exact_place.trim().to_string()).bind(input.request.trim().to_string()).bind(input.payment_method).bind(items).bind(total).bind(access.clone()).bind(now())
+        .fetch_one(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
+    for (pid,qty) in counts {sqlx::query("UPDATE ser_mart_products SET stock=stock-? WHERE id=?").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}
+    Ok(Json(json!({"id":id,"accessToken":access,"status":"Pending","total":total,"createdAt":now()})))
+}
+async fn my_order(State(s):State<AppState>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE access_token=?").bind(q.token.trim()).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found. Check the saved order on this device."))?;
+    Ok(Json(with_messages(&s.pool,order_json(&row)).await?))
+}
+async fn cancel_order(State(s):State<AppState>,Path(id):Path<i64>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(q.token.trim()).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let status:String=row.try_get("status").unwrap_or_default(); if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
+    let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
+    sqlx::query("UPDATE ser_mart_orders SET status='Cancelled' WHERE id=?").bind(id).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    for item in items.as_array().cloned().unwrap_or_default(){let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=? AND is_active=1").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}}
+    Ok(Json(json!({"ok":true,"status":"Cancelled"})))
+}
+async fn admin_orders(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());}
+    let rows=sqlx::query("SELECT * FROM ser_mart_orders ORDER BY id DESC").fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let mut all=Vec::new();for row in rows{all.push(with_messages(&s.pool,order_json(&row)).await?);}Ok(Json(json!(all)))
+}
+async fn set_order_status(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>,Json(input):Json<StatusInput>)->Result<Json<Value>,ApiError>{
+    if !admin_ok(&headers,&s){return Err(ApiError::auth());}
+    let allowed=["Pending","Confirmed","Preparing","Out for delivery","Delivered","Cancelled"];
+    if !allowed.contains(&input.status.as_str()){return Err(ApiError::bad("Choose a valid order status."));}
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let old:String=row.try_get("status").unwrap_or_default();
+    if old=="Cancelled"&&input.status!="Cancelled"{return Err(ApiError::bad("A cancelled order cannot be reopened."));}
+    if input.status=="Cancelled"&&old!="Cancelled"&&old!="Delivered"{
+        let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
+        for item in items.as_array().cloned().unwrap_or_default(){let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=? AND is_active=1").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}}
+    }
+    sqlx::query("UPDATE ser_mart_orders SET status=?,delivery_eta=? WHERE id=?").bind(input.status.clone()).bind(input.eta.trim().to_string()).bind(id).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!({"ok":true,"status":input.status})))
+}
+async fn send_message(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>,Json(input):Json<MessageInput>)->Result<Json<Value>,ApiError>{
+    let text=input.text.trim();if text.is_empty(){return Err(ApiError::bad("Write a message first."));}if text.len()>2000{return Err(ApiError::bad("Messages must be under 2,000 characters."));}
+    let seller=admin_ok(&headers,&s);
+    if seller {let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::missing("Order not found."));}}
+    else {let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(input.token.trim()).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::auth());}}
+    sqlx::query("INSERT INTO ser_mart_order_messages(order_id,sender,text,created_at) VALUES(?,?,?,?)").bind(id).bind(if seller{"seller"}else{"customer"}).bind(text.to_string()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!({"ok":true})))
+}
+
+#[tokio::main]
+async fn main()->Result<(),Box<dyn std::error::Error>>{
+    tracing_subscriber::fmt().with_target(false).compact().init(); install_default_drivers();
+    let url=env::var("DATABASE_URL").unwrap_or_else(|_|"sqlite://ser-mart.db?mode=rwc".into());
+    let pg=url.starts_with("postgres://")||url.starts_with("postgresql://");
+    let pool=AnyPoolOptions::new().max_connections(if pg{5}else{1}).connect(&url).await?; init_db(&pool,pg).await?;
+    let state=AppState{pool,sessions:Arc::new(Mutex::new(HashMap::new()))};
+    let app=Router::new()
+        .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin))
+        .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
+        .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
+        .route("/api/admin/products",get(admin_products).post(admin_create_product))
+        .route("/api/admin/products/{id}",put(admin_update_product).delete(admin_delete_product))
+        .route("/api/admin/images",post(upload_image)).route("/api/admin/orders",get(admin_orders))
+        .route("/api/admin/orders/{id}/status",patch(set_order_status)).route("/api/orders",post(create_order))
+        .route("/api/orders/mine",get(my_order)).route("/api/orders/{id}/cancel",post(cancel_order))
+        .route("/api/orders/{id}/messages",post(send_message))
+        .fallback_service(ServeDir::new("public")).layer(TraceLayer::new_for_http()).with_state(state);
+    let port:u16=env::var("PORT").ok().and_then(|v|v.parse().ok()).unwrap_or(10000);
+    let addr=SocketAddr::from(([0,0,0,0],port));
+    println!("Ser mart listening on {addr}; database: {}",if pg{"PostgreSQL"}else{"local SQLite (ephemeral on Render)"});
+    let listener=tokio::net::TcpListener::bind(addr).await?; axum::serve(listener,app).await?; Ok(())
+}
