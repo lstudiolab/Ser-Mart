@@ -422,7 +422,7 @@ body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keybo
 .admin-keyboard-open .admin-form-wrap{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
 .admin-keyboard-open .admin-editor{max-height:calc(100dvh - var(--admin-keyboard-height) - 12px);animation:none}
 .admin-form input,.admin-form textarea,.admin-form select{font-size:16px;scroll-margin-block:24px}
-.admin-form-wrap .admin-editor{transform:translateZ(0)}
+.admin-form-wrap .admin-editor{transform:none}
 @media(max-width:760px){
  .admin-form-wrap{padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
  .admin-editor{width:100%;max-height:94dvh;padding:10px 16px 22px;border-radius:27px}
@@ -532,4 +532,33 @@ button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-p
   .admin-form-wrap .file-pick{display:inline-flex}
   .admin-keyboard-open .admin-form-wrap{align-items:flex-start}
   .admin-keyboard-open .admin-form-wrap .admin-editor{max-height:none;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+}
+
+/* Seller-defined category manager */
+.category-admin-create,.category-admin-card{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;padding:20px;margin:18px 0;border:1px solid #e4e4e9;border-radius:24px;background:rgba(255,255,255,.88);box-shadow:0 6px 25px rgba(22,22,30,.035)}
+.category-admin-create h2{margin:4px 0 0;font-size:21px;letter-spacing:-.4px}
+.category-admin-card{grid-template-columns:minmax(0,1fr);gap:17px}
+.category-admin-photo{width:100%;height:168px;overflow:hidden;border-radius:18px;background:#f2f2f6}
+.category-admin-photo img{display:block;width:100%;height:100%;object-fit:cover}
+.category-admin-photo-empty{height:100%;display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;color:#888890;font-size:12px}
+.category-admin-photo-empty .inline-icon{width:24px;height:24px}
+.category-admin-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
+.category-admin-fields label,.category-admin-create label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:#5c5c63}
+.category-admin-fields input:not([type=file]),.category-admin-fields textarea,.category-admin-create input:not([type=file]),.category-admin-create textarea{display:block;width:100%;min-height:48px;padding:12px 14px;border:1px solid #d2d2d7;border-radius:13px;background:#fff;color:#202024;font:inherit;font-size:16px;line-height:1.4;appearance:none;-webkit-appearance:none;touch-action:auto;user-select:text;-webkit-user-select:text}
+.category-admin-fields textarea,.category-admin-create textarea{min-height:92px;resize:vertical}
+.category-admin-fields input[type=file],.category-admin-create input[type=file]{font-size:16px;max-width:100%}
+.category-admin-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.danger-text-button{min-height:40px;padding:8px 12px;border:0;border-radius:13px;background:transparent;color:#b4232b;font:inherit;font-size:12px;font-weight:600}
+.category-admin-count{margin:0;color:#888890;font-size:11px}
+.explore-products{padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:var(--ink)!important;box-shadow:none!important;font-weight:600}
+.explore-products:hover,.explore-products:active{background:transparent!important;color:var(--ink)!important;box-shadow:none!important;transform:none!important;opacity:.68}
+@media(min-width:760px){.category-admin-create{grid-template-columns:1fr 1fr}.category-admin-create>div,.category-admin-create>button{grid-column:1/-1}.category-admin-card{grid-template-columns:minmax(180px,.75fr) minmax(0,1.4fr);align-items:start}.category-admin-photo{height:100%;min-height:210px}.category-admin-create textarea,.category-admin-fields textarea{font-size:14px}}
+/* iOS Safari form focus: textareas stay directly interactive, with no transform/backdrop-filter ancestor. */
+@media(max-width:760px){
+  .admin-form-wrap{display:block!important;overflow-y:auto!important;overflow-x:hidden!important;position:fixed!important;inset:0!important;z-index:1000!important;padding:calc(8px + env(safe-area-inset-top)) 8px calc(22px + env(safe-area-inset-bottom))!important;background:rgba(18,18,22,.30)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;transform:none!important}
+  .admin-form-wrap .admin-editor{width:100%!important;max-height:none!important;min-height:0!important;overflow:visible!important;position:relative!important;transform:none!important;animation:none!important;contain:none!important;filter:none!important;will-change:auto!important}
+  .admin-form-wrap .admin-form{overflow:visible!important;transform:none!important;filter:none!important;animation:none!important}
+  .admin-form-wrap label:has(textarea[name="description"]){position:relative;z-index:2;pointer-events:auto!important}
+  .admin-form-wrap textarea[name="description"]{display:block!important;position:relative!important;z-index:3!important;width:100%!important;min-height:132px!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important;-webkit-appearance:none!important;appearance:none!important;font-size:16px!important;line-height:1.45!important;outline:none}
+  .category-admin-create textarea,.category-admin-fields textarea{font-size:16px!important;pointer-events:auto!important;touch-action:auto!important;user-select:text!important;-webkit-user-select:text!important}
 }
