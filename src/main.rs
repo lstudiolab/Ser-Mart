@@ -309,6 +309,7 @@ async fn send_message(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i
 #[tokio::main]
 async fn main()->Result<(),Box<dyn std::error::Error>>{
     tracing_subscriber::fmt().with_target(false).compact().init(); install_default_drivers();
+    if env::var("ADMIN_PASSWORD").map(|v|v.trim().is_empty()).unwrap_or(true) { return Err("ADMIN_PASSWORD must be set in the Render service environment".into()); }
     let url=env::var("DATABASE_URL").unwrap_or_else(|_|"sqlite://ser-mart.db?mode=rwc".into());
     let pg=url.starts_with("postgres://")||url.starts_with("postgresql://");
     let pool=AnyPoolOptions::new().max_connections(if pg{5}else{1}).connect(&url).await?; init_db(&pool,pg).await?;
