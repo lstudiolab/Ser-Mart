@@ -23,7 +23,7 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
       - name: Compile release binary
-        run: cargo build --locked --release
+        run: cargo build --release
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
