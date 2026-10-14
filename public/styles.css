@@ -302,6 +302,23 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
+/* Keep the buyer account fields as stable and native as the working seller password field. */
+#profile-form { padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; gap: 18px !important; }
+#profile-form label { display: flex !important; flex-direction: column !important; gap: 9px !important; color: #424245 !important; font-size: 13px !important; font-weight: 550 !important; }
+#profile-form input:not([type=radio]) {
+  display: block !important; width: 100% !important; min-height: 48px !important; padding: 12px 14px !important;
+  border: 1px solid #d2d2d7 !important; border-radius: 12px !important; background: #fff !important;
+  color: #1d1d1f !important; font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif !important;
+  -webkit-appearance: none !important; appearance: none !important; box-shadow: none !important;
+  transform: none !important; animation: none !important; touch-action: manipulation;
+}
+#profile-form input:not([type=radio]):focus { border-color: #86868b !important; outline: none !important; box-shadow: 0 0 0 2px rgba(0,0,0,.06) !important; }
+#profile-form .primary-button { min-height: 48px !important; border-radius: 999px !important; background: #000 !important; border-color: #000 !important; color: #fff !important; }
+@media (max-width: 760px) {
+  #profile-form { gap: 16px !important; }
+  #profile-form input:not([type=radio]) { font-size: 16px !important; }
+}
+
 /* Keyboard-safe checkout and refined, restrained motion */
 :root{--keyboard-height:0px}
 html{scroll-padding-top:18px;scroll-padding-bottom:calc(100px + var(--safe-bottom) + var(--keyboard-height))}
