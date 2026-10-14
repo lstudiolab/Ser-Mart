@@ -1,6 +1,6 @@
 use axum::{
-    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderValue, StatusCode},
-    response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
+    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderValue, StatusCode, Request},
+    middleware::{self, Next}, response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -152,6 +152,17 @@ fn price_for(base: f64, groups: &Value, selected: &Value) -> Result<f64, ApiErro
     }
     Ok(total.max(0.0))
 }
+async fn security_headers(req: Request<Body>, next: Next) -> Response {
+    let mut response = next.run(req).await;
+    let h = response.headers_mut();
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
+    h.insert(header::HeaderName::from_static("permissions-policy"), HeaderValue::from_static("camera=(), microphone=(), geolocation=()"));
+    h.insert(header::HeaderName::from_static("content-security-policy"), HeaderValue::from_static("default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"));
+    h.insert(header::HeaderName::from_static("cross-origin-opener-policy"), HeaderValue::from_static("same-origin"));
+    response
+}
 async fn html_index() -> Response {
     Response::builder().header(header::CONTENT_TYPE, "text/html; charset=utf-8").body(Body::from(include_str!("../public/index.html"))).unwrap()
 }
@@ -296,14 +307,24 @@ async fn set_order_status(State(s):State<AppState>,headers:HeaderMap,Path(id):Pa
     if !admin_ok(&headers,&s){return Err(ApiError::auth());}
     let allowed=["Pending","Confirmed","Preparing","Out for delivery","Delivered","Cancelled"];
     if !allowed.contains(&input.status.as_str()){return Err(ApiError::bad("Choose a valid order status."));}
-    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
     let old:String=row.try_get("status").unwrap_or_default();
     if old=="Cancelled"&&input.status!="Cancelled"{return Err(ApiError::bad("A cancelled order cannot be reopened."));}
-    if input.status=="Cancelled"&&old!="Cancelled"&&old!="Delivered"{
+    if old=="Delivered"&&input.status=="Cancelled"{return Err(ApiError::bad("A delivered order cannot be cancelled."));}
+    if old=="Cancelled"&&input.status=="Cancelled"{return Ok(Json(json!({"ok":true,"status":"Cancelled"})));}
+    let changed=sqlx::query("UPDATE ser_mart_orders SET status=?,delivery_eta=? WHERE id=? AND status=?")
+        .bind(input.status.clone()).bind(input.eta.trim().to_string()).bind(id).bind(old.clone())
+        .execute(&mut *tx).await.map_err(|_|ApiError::internal())?;
+    if changed.rows_affected()==0{return Err(ApiError::bad("This order has already been updated. Refresh and try again."));}
+    if input.status=="Cancelled"&&old!="Delivered"{
         let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
-        for item in items.as_array().cloned().unwrap_or_default(){let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=? AND is_active=1").bind(qty).bind(pid).execute(&s.pool).await.map_err(|_|ApiError::internal())?;}}
+        for item in items.as_array().cloned().unwrap_or_default(){
+            let pid=item["productId"].as_i64().unwrap_or(0);let qty=item["quantity"].as_i64().unwrap_or(0);
+            if pid>0&&qty>0{sqlx::query("UPDATE ser_mart_products SET stock=stock+? WHERE id=?").bind(qty).bind(pid).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;}
+        }
     }
-    sqlx::query("UPDATE ser_mart_orders SET status=?,delivery_eta=? WHERE id=?").bind(input.status.clone()).bind(input.eta.trim().to_string()).bind(id).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    tx.commit().await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"ok":true,"status":input.status})))
 }
 async fn send_message(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>,Json(input):Json<MessageInput>)->Result<Json<Value>,ApiError>{
@@ -333,7 +354,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
         .route("/api/admin/orders/{id}/status",patch(set_order_status)).route("/api/orders",post(create_order))
         .route("/api/orders/mine",get(my_order)).route("/api/orders/{id}/cancel",post(cancel_order))
         .route("/api/orders/{id}/messages",post(send_message))
-        .fallback_service(ServeDir::new("public")).layer(TraceLayer::new_for_http()).with_state(state);
+        .fallback_service(ServeDir::new("public")).layer(TraceLayer::new_for_http()).layer(middleware::from_fn(security_headers)).with_state(state);
     let port:u16=env::var("PORT").ok().and_then(|v|v.parse().ok()).unwrap_or(10000);
     let addr=SocketAddr::from(([0,0,0,0],port));
     println!("Ser mart listening on {addr}; database: {}",if pg{"PostgreSQL"}else{"local SQLite (ephemeral on Render)"});
