@@ -291,16 +291,10 @@ fn category_json(r: &sqlx::any::AnyRow) -> Value {
     })
 }
 async fn category_list(pool: &AnyPool) -> Result<Value, ApiError> {
-    let rows = sqlx::query("SELECT c.id, c.name, c.description, c.image_url, c.created_at, (SELECT COUNT(*) FROM ser_mart_products p WHERE p.is_active=1 AND (p.category=c.name OR p.category LIKE ?)) AS product_count FROM ser_mart_categories c ORDER BY c.id ASC")
+    let rows = sqlx::query("SELECT c.id, c.name, c.description, c.image_url, c.created_at, (SELECT COUNT(*) FROM ser_mart_products p WHERE p.is_active=1 AND (p.category=c.name OR p.category LIKE c.name || '::%')) AS product_count FROM ser_mart_categories c ORDER BY c.id ASC")
         .fetch_all(pool).await.map_err(|_| ApiError::internal())?;
-    let mut categories = Vec::new();
-    for row in rows {
-        let name: String = row.try_get("name").unwrap_or_default();
-        categories.push(category_json_with_prefix(&row, format!("{name}::%")));
-    }
-    Ok(json!(categories))
+    Ok(json!(rows.iter().map(category_json).collect::<Vec<_>>()))
 }
-fn category_json_with_prefix(r: &sqlx::any::AnyRow, _prefix: String) -> Value { category_json(r) }
 async fn list_categories(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
     Ok(Json(category_list(&s.pool).await?))
 }
