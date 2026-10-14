@@ -83,6 +83,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         format!("CREATE TABLE IF NOT EXISTS ser_mart_images (
             id {id}, image_data TEXT NOT NULL, content_type TEXT NOT NULL, created_at TEXT NOT NULL
         )"),
+        "CREATE TABLE IF NOT EXISTS ser_mart_categories (id {id}, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '', image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)".to_string(),
         "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
@@ -90,6 +91,17 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
     for statement in sql { sqlx::query(&statement).execute(pool).await?; }
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN release_date TEXT NOT NULL DEFAULT ''").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE ser_mart_categories ADD COLUMN description TEXT NOT NULL DEFAULT ''").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE ser_mart_categories ADD COLUMN image_url TEXT NOT NULL DEFAULT ''").execute(pool).await;
+    // Preserve existing product categories when seller-managed categories are introduced.
+    let existing_categories = sqlx::query("SELECT DISTINCT category FROM ser_mart_products").fetch_all(pool).await?;
+    for row in existing_categories {
+        let raw: String = row.try_get("category").unwrap_or_default();
+        let name = raw.split("::").next().unwrap_or("").trim().to_string();
+        if name.is_empty() || name.eq_ignore_ascii_case("other") { continue; }
+        sqlx::query("INSERT INTO ser_mart_categories (name, description, image_url, created_at) VALUES (?, '', '', ?) ON CONFLICT(name) DO NOTHING")
+            .bind(name).bind(now()).execute(pool).await?;
+    }
     Ok(())
 }
 fn parse_json(v: String, fallback: Value) -> Value { serde_json::from_str(&v).unwrap_or(fallback) }
@@ -261,6 +273,97 @@ async fn upload_image(State(s):State<AppState>,headers:HeaderMap,Json(input):Jso
     Ok(Json(json!({"imageUrl":format!("/api/images/{id}")})))
 }
 
+
+#[derive(Deserialize)]
+struct CategoryInput {
+    name: String,
+    #[serde(default)] description: String,
+    #[serde(rename="imageUrl", default)] image_url: String,
+}
+fn category_json(r: &sqlx::any::AnyRow) -> Value {
+    json!({
+        "id": r.try_get::<i64,_>("id").unwrap_or_default(),
+        "name": r.try_get::<String,_>("name").unwrap_or_default(),
+        "description": r.try_get::<String,_>("description").unwrap_or_default(),
+        "imageUrl": r.try_get::<String,_>("image_url").unwrap_or_default(),
+        "createdAt": r.try_get::<String,_>("created_at").unwrap_or_default(),
+        "productCount": r.try_get::<i64,_>("product_count").unwrap_or_default()
+    })
+}
+async fn category_list(pool: &AnyPool) -> Result<Value, ApiError> {
+    let rows = sqlx::query("SELECT c.id, c.name, c.description, c.image_url, c.created_at, (SELECT COUNT(*) FROM ser_mart_products p WHERE p.is_active=1 AND (p.category=c.name OR p.category LIKE ?)) AS product_count FROM ser_mart_categories c ORDER BY c.id ASC")
+        .fetch_all(pool).await.map_err(|_| ApiError::internal())?;
+    let mut categories = Vec::new();
+    for row in rows {
+        let name: String = row.try_get("name").unwrap_or_default();
+        categories.push(category_json_with_prefix(&row, format!("{name}::%")));
+    }
+    Ok(json!(categories))
+}
+fn category_json_with_prefix(r: &sqlx::any::AnyRow, _prefix: String) -> Value { category_json(r) }
+async fn list_categories(State(s): State<AppState>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(category_list(&s.pool).await?))
+}
+async fn admin_categories(State(s): State<AppState>, h: HeaderMap) -> Result<Json<Value>, ApiError> {
+    if !admin_ok(&h, &s) { return Err(ApiError::auth()); }
+    Ok(Json(category_list(&s.pool).await?))
+}
+async fn create_category(State(s): State<AppState>, h: HeaderMap, Json(input): Json<CategoryInput>) -> Result<Json<Value>, ApiError> {
+    if !admin_ok(&h, &s) { return Err(ApiError::auth()); }
+    let name = input.name.trim().to_string();
+    let description = input.description.trim().to_string();
+    let image_url = input.image_url.trim().to_string();
+    if name.is_empty() || name.chars().count() > 60 { return Err(ApiError::bad("Enter a category name up to 60 characters.")); }
+    if description.chars().count() > 500 { return Err(ApiError::bad("Category description must be 500 characters or fewer.")); }
+    let exists = sqlx::query("SELECT id FROM ser_mart_categories WHERE LOWER(name)=LOWER(?)").bind(&name).fetch_optional(&s.pool).await.map_err(|_| ApiError::internal())?;
+    if exists.is_some() { return Err(ApiError::bad("That category already exists. Choose another name.")); }
+    sqlx::query("INSERT INTO ser_mart_categories (name, description, image_url, created_at) VALUES (?,?,?,?)")
+        .bind(name).bind(description).bind(image_url).bind(now()).execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+    Ok(Json(category_list(&s.pool).await?))
+}
+async fn update_category(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>, Json(input): Json<CategoryInput>) -> Result<Json<Value>, ApiError> {
+    if !admin_ok(&h, &s) { return Err(ApiError::auth()); }
+    let name = input.name.trim().to_string();
+    let description = input.description.trim().to_string();
+    let image_url = input.image_url.trim().to_string();
+    if name.is_empty() || name.chars().count() > 60 { return Err(ApiError::bad("Enter a category name up to 60 characters.")); }
+    if description.chars().count() > 500 { return Err(ApiError::bad("Category description must be 500 characters or fewer.")); }
+    let old_row = sqlx::query("SELECT name FROM ser_mart_categories WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_| ApiError::internal())?.ok_or_else(|| ApiError::missing("Category not found."))?;
+    let old_name: String = old_row.try_get("name").unwrap_or_default();
+    let exists = sqlx::query("SELECT id FROM ser_mart_categories WHERE LOWER(name)=LOWER(?) AND id<>?").bind(&name).bind(id).fetch_optional(&s.pool).await.map_err(|_| ApiError::internal())?;
+    if exists.is_some() { return Err(ApiError::bad("That category already exists. Choose another name.")); }
+    if old_name != name {
+        let rows = sqlx::query("SELECT id, category FROM ser_mart_products").fetch_all(&s.pool).await.map_err(|_| ApiError::internal())?;
+        for row in rows {
+            let product_id: i64 = row.try_get("id").unwrap_or_default();
+            let category: String = row.try_get("category").unwrap_or_default();
+            if category == old_name || category.starts_with(&(old_name.clone() + "::")) {
+                let suffix = category.strip_prefix(&old_name).unwrap_or("");
+                sqlx::query("UPDATE ser_mart_products SET category=? WHERE id=?").bind(format!("{name}{suffix}")).bind(product_id).execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+            }
+        }
+    }
+    sqlx::query("UPDATE ser_mart_categories SET name=?, description=?, image_url=? WHERE id=?")
+        .bind(name).bind(description).bind(image_url).bind(id).execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+    Ok(Json(category_list(&s.pool).await?))
+}
+async fn delete_category(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) -> Result<Json<Value>, ApiError> {
+    if !admin_ok(&h, &s) { return Err(ApiError::auth()); }
+    let row = sqlx::query("SELECT name FROM ser_mart_categories WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_| ApiError::internal())?.ok_or_else(|| ApiError::missing("Category not found."))?;
+    let name: String = row.try_get("name").unwrap_or_default();
+    // Keep products, orders, and images; remove only their category assignment.
+    let products = sqlx::query("SELECT id, category FROM ser_mart_products").fetch_all(&s.pool).await.map_err(|_| ApiError::internal())?;
+    for product in products {
+        let product_id: i64 = product.try_get("id").unwrap_or_default();
+        let product_category: String = product.try_get("category").unwrap_or_default();
+        if product_category == name || product_category.starts_with(&(name.clone() + "::")) {
+            sqlx::query("UPDATE ser_mart_products SET category='' WHERE id=?").bind(product_id).execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+        }
+    }
+    sqlx::query("DELETE FROM ser_mart_categories WHERE id=?").bind(id).execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+    Ok(Json(json!({"ok":true, "category":name})))
+}
+
 #[derive(Deserialize)]
 struct SellerInfoInput { #[serde(default)] name:String, #[serde(default)] phone:String, #[serde(rename="gcashNumber",default)] gcash_number:String, #[serde(rename="gcashName",default)] gcash_name:String, #[serde(rename="pickupAddress",default)] pickup_address:String }
 fn seller_info_json(r:&sqlx::any::AnyRow)->Value { json!({"name":r.try_get::<String,_>("name").unwrap_or_default(),"phone":r.try_get::<String,_>("phone").unwrap_or_default(),"gcashNumber":r.try_get::<String,_>("gcash_number").unwrap_or_default(),"gcashName":r.try_get::<String,_>("gcash_name").unwrap_or_default(),"pickupAddress":r.try_get::<String,_>("pickup_address").unwrap_or_default()}) }
@@ -371,6 +474,9 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
         .route("/api/admin/products/{id}",put(admin_update_product).delete(admin_delete_product))
+        .route("/api/categories",get(list_categories))
+        .route("/api/admin/categories",get(admin_categories).post(create_category))
+        .route("/api/admin/categories/{id}",put(update_category).delete(delete_category))
         .route("/api/seller-info",get(get_seller_info)).route("/api/admin/seller-info",get(admin_seller_info).put(update_seller_info))
         .route("/api/admin/images",post(upload_image)).route("/api/admin/orders",get(admin_orders))
         .route("/api/admin/orders/{id}/status",patch(set_order_status)).route("/api/orders",post(create_order))
