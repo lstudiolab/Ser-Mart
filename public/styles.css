@@ -334,3 +334,10 @@ body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keybo
   .main-view>section,.main-view>.product-grid,.main-view>.orders-list,.main-view>.cart-layout,.main-view>.checkout-layout,.main-view>.form-panel,.main-view>.empty-state,.product-card,.detail-screen,.selection-sheet,.sheet-backdrop{animation:none!important}
   .checkout-order-bar,.toast{transition:none!important}
 }
+
+/* Public catalogue availability labels */
+.product-photo{position:relative}
+.sold-out-label{position:absolute;left:10px;bottom:10px;padding:7px 10px;border:1px solid #ffffffd9;border-radius:999px;background:#ffffffed;color:#55555c;font-size:10px;font-weight:650;box-shadow:0 3px 12px #0000000a}
+.product-card.sold-out .product-photo img{filter:saturate(.72)}
+.product-card.sold-out .product-hint{color:#8b7373}
+.sold-out-message{grid-column:1/-1;margin:0;padding:13px 16px;border-radius:14px;background:#f1f1f4;color:#696970;text-align:center;font-size:13px;font-weight:600}
