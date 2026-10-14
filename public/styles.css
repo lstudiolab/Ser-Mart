@@ -267,7 +267,7 @@ body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .store-error-state{padding:50px 0;max-width:560px}
 .store-error-state h1{font-size:clamp(32px,5vw,50px);letter-spacing:-1.8px;line-height:1.05}
 .store-error-state p{color:#6e6e73;line-height:1.6}
-a,button,input,textarea{touch-action:manipulation}
+a,button{touch-action:manipulation}input,textarea,select{touch-action:auto!important;-webkit-user-select:text;user-select:text}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #0071e3;outline-offset:3px}
 @media(max-width:760px){
  .topbar{padding:12px 18px 8px;min-height:55px}
@@ -310,7 +310,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
   border: 1px solid #d2d2d7 !important; border-radius: 12px !important; background: #fff !important;
   color: #1d1d1f !important; font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif !important;
   -webkit-appearance: none !important; appearance: none !important; box-shadow: none !important;
-  transform: none !important; animation: none !important; touch-action: manipulation;
+  transform: none !important; animation: none !important; touch-action: auto !important;
 }
 #profile-form input:not([type=radio]):focus { border-color: #86868b !important; outline: none !important; box-shadow: 0 0 0 2px rgba(0,0,0,.06) !important; }
 #profile-form .primary-button { min-height: 48px !important; border-radius: 999px !important; background: #000 !important; border-color: #000 !important; color: #fff !important; }
