@@ -712,3 +712,54 @@ body.checkout-active .form-panel textarea::placeholder { color: #8a8a90 !importa
  body.checkout-active .checkout-order-bar { bottom: calc(8px + env(safe-area-inset-bottom)) !important; }
  body.checkout-active.keyboard-open .checkout-order-bar { bottom: calc(8px + env(safe-area-inset-bottom)) !important; }
 }
+
+
+/* Softer, rounder Ser mart surfaces inspired by Kira's conversation cards. */
+:root { --card-radius: 30px; }
+.product-card,.category-card,.category-profile,.welcome-panel,.empty-state,
+.order-card,.cart-row,.cart-summary,.form-panel,.profile-note,.search-field,
+.detail-screen,.selection-sheet,.selection-product,.category-admin-create,
+.category-admin-card,.admin-editor,.admin-login-card,.checkout-summary {
+  border-radius: 30px !important;
+}
+.product-card { border-radius: 30px !important; }
+.product-photo { position: relative; isolation: isolate; background: #f4f4f6; }
+.product-photo::after,
+.new-arrival-photo::after,
+.detail-photo::after,
+.cart-thumb::after,
+.selection-photo::after,
+.category-admin-photo::after,
+.category-image-wrap::after,
+.category-profile-hero::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255,255,255,0) 48%, rgba(255,255,255,.18) 65%, rgba(255,255,255,.78) 88%, #fff 100%);
+}
+.product-photo img,.new-arrival-photo img,.detail-photo img,.cart-thumb img,
+.selection-photo img,.category-admin-photo img,.category-image-wrap img,
+.category-profile-hero img { position: relative; z-index: 0; }
+.product-photo img { transition: transform .35s ease; }
+.product-card:hover .product-photo img { transform: scale(1.035); }
+.product-info { position: relative; z-index: 2; background: #fff; border-radius: 0 0 30px 30px; }
+.cart-thumb,.selection-photo,.category-admin-photo,.category-image-wrap,.detail-photo,.new-arrival-photo,.category-profile-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.cart-thumb,.selection-photo { border-radius: 21px !important; }
+.detail-screen { overflow: hidden; }
+.detail-photo { border-radius: 30px 30px 0 0; }
+.selection-sheet { border-radius: 34px !important; }
+.selection-product,.cart-row,.order-card,.category-admin-card,.category-admin-create { border-radius: 28px !important; }
+.choice-option { border-radius: 19px !important; }
+@media (max-width: 760px) {
+  .main-view { width: calc(100% - 32px); }
+  .product-grid { gap: 13px; }
+  .product-card { border-radius: 27px !important; }
+  .product-info { border-radius: 0 0 27px 27px; }
+  .welcome-panel { border-radius: 30px !important; }
+}
