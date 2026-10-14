@@ -461,3 +461,19 @@ body.checkout-active.keyboard-open{scroll-padding-bottom:calc(24px + var(--keybo
 .detail-buy-now{width:100%;min-height:54px;border-radius:18px!important;font-size:17px}
 .all-items-group{margin:26px 0 34px}.all-items-group>.section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.all-items-group>.section-heading h2{margin:0;font-size:23px;letter-spacing:-.03em}
 @media(min-width:680px){.detail-photo{border-radius:28px}.detail-photo>img{mask-image:linear-gradient(to right,#000 65%,transparent 100%);-webkit-mask-image:linear-gradient(to right,#000 65%,transparent 100%)}.detail-actions{left:50%;right:auto;transform:translateX(-50%);width:min(680px,100%);border-radius:22px 22px 0 0}}
+
+/* Smooth, restrained motion inspired by native iOS transitions. */
+:root{--motion-spring:cubic-bezier(.22,1,.36,1);--motion-soft:cubic-bezier(.2,.8,.2,1)}
+button,a,.product-card,.category-card,.new-arrival-card,.detail-screen,.detail-photo img,.admin-editor,.selection-sheet,.bottom-nav,.nav-item{transition-property:transform,opacity,background-color,border-color,box-shadow,color;transition-duration:.32s;transition-timing-function:var(--motion-spring)}
+.product-card:active,.category-card:active,.nav-item:active,.primary-button:active,.secondary-button:active{transform:scale(.975)}
+.product-photo img,.new-arrival-photo img{transition:transform .75s var(--motion-spring),opacity .4s ease}
+.product-card:hover .product-photo img{transform:scale(1.035)}
+.new-arrival-card{animation:soft-arrive .65s var(--motion-spring) both;transform-origin:50% 60%}
+.product-card{animation:soft-arrive .45s var(--motion-spring) both}
+.admin-editor{animation:sheet-up .38s var(--motion-spring) both}
+.pod-section-field select{width:100%;min-height:48px;padding:12px 14px;border:1px solid #32323c17;border-radius:15px;outline:0;background:#f8f8fae6;color:#242427;font-size:14px}
+.pod-section-field small{color:#85858c;font-size:11px;font-weight:450;line-height:1.5}
+.pod-subgroup{margin-top:8px;padding-top:3px}
+.pod-subgroup>.section-heading{margin-top:22px}
+@keyframes soft-arrive{from{opacity:0;transform:translateY(12px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
