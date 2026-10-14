@@ -263,7 +263,7 @@ async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Re
     if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
     if input.address.trim().is_empty(){return Err(ApiError::bad("Please enter your address."));}
     if input.exact_place.trim().is_empty(){return Err(ApiError::bad("Please add the exact place to deliver to."));}
-    if !["COD","GCash"].contains(&input.payment_method.as_str()){return Err(ApiError::bad("Choose GCash or cash on delivery."));}
+    if !["COD","GCash","COP"].contains(&input.payment_method.as_str()){return Err(ApiError::bad("Choose GCash, cash on delivery, or cash on pickup."));}
     if input.items.is_empty()||input.items.len()>50{return Err(ApiError::bad("Your cart is empty or has too many items."));}
     let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
     let mut counts:HashMap<i64,i64>=HashMap::new(); let mut snapshots=Vec::new(); let mut total=0.0_f64;
