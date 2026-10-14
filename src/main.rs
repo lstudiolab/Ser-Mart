@@ -86,8 +86,8 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
     ];
     for statement in sql { sqlx::query(&statement).execute(pool).await?; }
-    sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await?;
-    sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN IF NOT EXISTS release_date TEXT NOT NULL DEFAULT ''").execute(pool).await?;
+    let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN release_date TEXT NOT NULL DEFAULT ''").execute(pool).await;
     Ok(())
 }
 fn parse_json(v: String, fallback: Value) -> Value { serde_json::from_str(&v).unwrap_or(fallback) }
