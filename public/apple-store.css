@@ -339,3 +339,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Match the Apple Store's concise home-page hero hierarchy and copy. */
+.home-products-heading .eyebrow { display: none; }
+.home-products-heading h2 { margin-top: 0; }
+.home-products-heading>div::after { content: "The best way to buy the products you love."; }
+.home-products-heading + .category-grid { margin-top: 0; }
