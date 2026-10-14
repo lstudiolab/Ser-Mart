@@ -82,6 +82,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         format!("CREATE TABLE IF NOT EXISTS ser_mart_images (
             id {id}, image_data TEXT NOT NULL, content_type TEXT NOT NULL, created_at TEXT NOT NULL
         )"),
+        "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
     ];
@@ -258,6 +259,13 @@ async fn upload_image(State(s):State<AppState>,headers:HeaderMap,Json(input):Jso
     let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"imageUrl":format!("/api/images/{id}")})))
 }
+
+#[derive(Deserialize)]
+struct SellerInfoInput { #[serde(default)] name:String, #[serde(default)] phone:String, #[serde(rename="gcashNumber",default)] gcash_number:String, #[serde(rename="gcashName",default)] gcash_name:String, #[serde(rename="pickupAddress",default)] pickup_address:String }
+fn seller_info_json(r:&sqlx::any::AnyRow)->Value { json!({"name":r.try_get::<String,_>("name").unwrap_or_default(),"phone":r.try_get::<String,_>("phone").unwrap_or_default(),"gcashNumber":r.try_get::<String,_>("gcash_number").unwrap_or_default(),"gcashName":r.try_get::<String,_>("gcash_name").unwrap_or_default(),"pickupAddress":r.try_get::<String,_>("pickup_address").unwrap_or_default()}) }
+async fn get_seller_info(State(s):State<AppState>)->Result<Json<Value>,ApiError>{let row=sqlx::query("SELECT name,phone,gcash_number,gcash_name,pickup_address FROM ser_mart_seller_profile WHERE id=1").fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;Ok(Json(row.map(|r|seller_info_json(&r)).unwrap_or(json!({"name":"Ser mart","phone":"","gcashNumber":"","gcashName":"","pickupAddress":""}))))}
+async fn admin_seller_info(State(s):State<AppState>,h:HeaderMap)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::unauthorized());}get_seller_info(State(s)).await}
+async fn update_seller_info(State(s):State<AppState>,h:HeaderMap,Json(i):Json<SellerInfoInput>)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::unauthorized());}sqlx::query("INSERT INTO ser_mart_seller_profile (id,name,phone,gcash_number,gcash_name,pickup_address,updated_at) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,phone=excluded.phone,gcash_number=excluded.gcash_number,gcash_name=excluded.gcash_name,pickup_address=excluded.pickup_address,updated_at=excluded.updated_at").bind(i.name.trim()).bind(i.phone.trim()).bind(i.gcash_number.trim()).bind(i.gcash_name.trim()).bind(i.pickup_address.trim()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;get_seller_info(State(s)).await}
 async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
     if input.customer_name.trim().is_empty(){return Err(ApiError::bad("Please enter your name."));}
     if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
@@ -362,6 +370,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
         .route("/api/admin/products/{id}",put(admin_update_product).delete(admin_delete_product))
+        .route("/api/seller-info",get(get_seller_info)).route("/api/admin/seller-info",get(admin_seller_info).put(update_seller_info))
         .route("/api/admin/images",post(upload_image)).route("/api/admin/orders",get(admin_orders))
         .route("/api/admin/orders/{id}/status",patch(set_order_status)).route("/api/orders",post(create_order))
         .route("/api/orders/mine",get(my_order)).route("/api/orders/{id}/cancel",post(cancel_order))
