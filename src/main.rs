@@ -1,5 +1,5 @@
 use axum::{
-    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderValue, StatusCode, Request},
+    body::Body, extract::{Path, Query, State}, http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Request},
     middleware::{self, Next}, response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
 };
 use serde::Deserialize;
@@ -155,10 +155,10 @@ fn price_for(base: f64, groups: &Value, selected: &Value) -> Result<f64, ApiErro
 async fn security_headers(req: Request<Body>, next: Next) -> Response {
     let mut response = next.run(req).await;
     let h = response.headers_mut();
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
-    h.insert(header::HeaderName::from_static("permissions-policy"), HeaderValue::from_static("camera=(), microphone=(), geolocation=()"));
+    h.insert(HeaderName::from_static("x-content-type-options"), HeaderValue::from_static("nosniff"));
+    h.insert(HeaderName::from_static("x-frame-options"), HeaderValue::from_static("DENY"));
+    h.insert(HeaderName::from_static("referrer-policy"), HeaderValue::from_static("strict-origin-when-cross-origin"));
+    h.insert(HeaderName::from_static("permissions-policy"), HeaderValue::from_static("camera=(), microphone=(), geolocation=()"));
     h.insert(header::HeaderName::from_static("content-security-policy"), HeaderValue::from_static("default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"));
     h.insert(header::HeaderName::from_static("cross-origin-opener-policy"), HeaderValue::from_static("same-origin"));
     response
