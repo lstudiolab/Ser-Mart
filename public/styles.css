@@ -774,3 +774,53 @@ body.checkout-active .form-panel textarea::placeholder { color: #8a8a90 !importa
 #customer-auth-form .primary-button{width:100%;min-height:50px;border-radius:999px}
 #toggle-customer-auth{margin:18px 2px 0}
 @media(max-width:760px){#customer-auth-form{gap:16px;padding:18px!important}#customer-auth-form input,#checkout-form input,#checkout-form textarea{font-size:16px!important;line-height:1.4!important;min-height:50px!important}#customer-auth-form label,#checkout-form label{scroll-margin-top:18px;scroll-margin-bottom:calc(var(--keyboard-height,0px) + 32px)}#view{overflow:visible;transform:none!important;filter:none!important}}
+
+
+/* Critical iOS input recovery: never place editable controls inside animated/transformed
+   containing blocks. Safari can fail to summon the software keyboard when these coexist. */
+html, body {
+  -webkit-text-size-adjust: 100%;
+  touch-action: auto !important;
+}
+#view, .main-view, .main-view > section, .settings-card,
+.form-panel, .checkout-layout, .checkout-heading, .cart-layout,
+.orders-list, .order-card, .message-form, .search-field {
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+  animation: none !important;
+  will-change: auto !important;
+}
+input, textarea, select, [contenteditable="true"] {
+  position: relative !important;
+  z-index: 2 !important;
+  display: block;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  touch-action: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-transform: translateZ(0);
+  transform: none !important;
+  caret-color: #1d1d1f !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+textarea, select {
+  min-height: 48px;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+}
+.form-panel label, .settings-card, .checkout-layout,
+#customer-auth-form, #checkout-form, .message-form {
+  transform: none !important;
+  animation: none !important;
+}
+@media (max-width: 760px) {
+  html, body { overflow-x: clip; }
+  #view, .main-view, .app-shell { transform: none !important; }
+  .bottom-nav, .checkout-order-bar { transition: none !important; }
+}
