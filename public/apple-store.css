@@ -7,8 +7,8 @@
   --line: rgba(29,29,31,.13);
   --paper: #fff;
   --surface: #f5f5f7;
-  --blue: #06c;
-  --blue-hover: #0077ed;
+  --blue: #000;
+  --blue-hover: #262626;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
   font-synthesis: none;
@@ -19,7 +19,7 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 button, input, textarea, select { font-family: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  outline: 3px solid rgba(0,102,204,.35);
+  outline: 2px solid rgba(0,0,0,.24);
   outline-offset: 2px;
 }
 .app-shell { min-height: 100dvh; padding-bottom: 36px; }
@@ -137,7 +137,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .product-hint { color: var(--muted); font-size: 12px; }
 .photo-placeholder { background: #e9e9ed; color: #6e6e73; }
 
-/* Apple-style blue calls to action: clear, compact, and consistent. */
+/* Black, restrained calls to action inspired by Apple Store product pages. */
 .primary-button, .secondary-button {
   min-height: 40px; gap: 7px; padding: 0 18px; border: 1px solid transparent;
   border-radius: 999px; background: var(--blue); color: #fff;
@@ -148,7 +148,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .primary-button:active, .secondary-button:active { transform: scale(.98); }
 .primary-button.compact { min-height: 36px; padding: 0 16px; border-radius: 999px; font-size: 13px; }
 .secondary-button { border-color: var(--blue); background: transparent; color: var(--blue); box-shadow: none; }
-.secondary-button:hover { background: rgba(0,102,204,.06); }
+.secondary-button:hover { background: rgba(0,0,0,.04); }
 .primary-button svg, .text-button svg { width: 15px; height: 15px; }
 .empty-state { min-height: 250px; border: 0; border-radius: 20px; background: var(--surface); }
 .empty-symbol { border: 0; border-radius: 50%; background: #e5e5ea; }
@@ -192,7 +192,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .selection-photo { border-radius: 12px; background: #fff; }
 .selection-group legend { font-size: 14px; font-weight: 600; }
 .choice-option { min-height: 40px; border: 1px solid #d2d2d7; border-radius: 10px; background: #fff; color: #1d1d1f; font-size: 13px; }
-.choice-option.picked { border-color: var(--blue); background: rgba(0,102,204,.06); color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+.choice-option.picked { border-color: var(--blue); background: rgba(0,0,0,.04); color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
 .quantity-control { height: 36px; gap: 9px; border: 1px solid #d2d2d7; border-radius: 999px; background: #fff; }
 .quantity-control button { width: 28px; height: 28px; border-radius: 50%; background: #f5f5f7; }
 .selection-bottom { background: rgba(255,255,255,.97); }
@@ -213,7 +213,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .form-panel input:not([type=radio]), .form-panel textarea, .admin-form input:not([type=checkbox]), .admin-form textarea, .admin-form select, .admin-search {
   min-height: 48px; border: 1px solid #d2d2d7; border-radius: 12px; background: #fff; color: var(--ink); font-size: 16px; box-shadow: none;
 }
-.form-panel input:focus, .form-panel textarea:focus, .admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus { border-color: #86868b; box-shadow: 0 0 0 3px rgba(0,102,204,.1); }
+.form-panel input:focus, .form-panel textarea:focus, .admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus { border-color: #86868b; box-shadow: 0 0 0 3px rgba(0,0,0,.08); }
 .payment-choice { border: 1px solid #d2d2d7; border-radius: 12px; background: #fff; padding: 14px; }
 .payment-choice input { accent-color: var(--blue); }
 .payment-icon { border-radius: 10px; background: var(--surface); }
@@ -345,3 +345,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .home-products-heading h2 { margin-top: 0; }
 .home-products-heading>div::after { content: "The best way to buy the products you love."; }
 .home-products-heading + .category-grid { margin-top: 0; }
+
+
+/* Keep Ser mart's controls monochrome and consistent across the storefront. */
+.primary-button,.secondary-button{background:#000;color:#fff;border-color:#000;box-shadow:none}
+.primary-button:hover,.secondary-button:hover{background:#262626;color:#fff;border-color:#262626}
+.secondary-button{background:#fff;color:#000;border-color:#000}
+.secondary-button:hover{background:#f5f5f7;color:#000;border-color:#000}
+.text-button,.explore-products,.new-arrival-link,.store-footer a,.seller-entry:hover{color:#1d1d1f}
+.text-button:hover,.explore-products:hover,.new-arrival-link:hover,.store-footer a:hover{color:#6e6e73}
+.choice-option.picked{border-color:#000;background:#000;color:#fff;box-shadow:inset 0 0 0 1px #000}
+.choice-option.picked small{color:#fff}
+.payment-choice input{accent-color:#000}
+.count-badge{background:#000}
+.form-panel input:focus,.form-panel textarea:focus,.admin-form input:focus,.admin-form textarea:focus,.admin-form select:focus{border-color:#86868b;box-shadow:0 0 0 2px rgba(0,0,0,.07)}
