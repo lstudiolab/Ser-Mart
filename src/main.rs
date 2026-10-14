@@ -370,7 +370,6 @@ async fn get_seller_info(State(s):State<AppState>)->Result<Json<Value>,ApiError>
 async fn admin_seller_info(State(s):State<AppState>,h:HeaderMap)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}get_seller_info(State(s)).await}
 async fn update_seller_info(State(s):State<AppState>,h:HeaderMap,Json(i):Json<SellerInfoInput>)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}sqlx::query("INSERT INTO ser_mart_seller_profile (id,name,phone,gcash_number,gcash_name,pickup_address,updated_at) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,phone=excluded.phone,gcash_number=excluded.gcash_number,gcash_name=excluded.gcash_name,pickup_address=excluded.pickup_address,updated_at=excluded.updated_at").bind(i.name.trim()).bind(i.phone.trim()).bind(i.gcash_number.trim()).bind(i.gcash_name.trim()).bind(i.pickup_address.trim()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;get_seller_info(State(s)).await}
 async fn create_order(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
-    let _customer_id=customer_id(&headers,&s)?;
     if input.customer_name.trim().is_empty(){return Err(ApiError::bad("Please enter your name."));}
     if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
     if input.address.trim().is_empty(){return Err(ApiError::bad("Please enter your address."));}
