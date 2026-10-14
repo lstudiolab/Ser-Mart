@@ -48,8 +48,6 @@ struct StatusInput { status: String, #[serde(default)] eta: String }
 #[derive(Deserialize)]
 struct MessageInput { #[serde(default)] token: String, text: String }
 #[derive(Deserialize)]
-struct TokenQuery { token: String }
-#[derive(Deserialize)]
 struct SearchQuery { #[serde(default)] q: String }
 
 fn now() -> String { chrono::Utc::now().to_rfc3339() }
@@ -279,13 +277,18 @@ async fn create_order(State(s):State<AppState>,Json(input):Json<OrderInput>)->Re
     tx.commit().await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"id":id,"accessToken":access,"status":"Pending","total":total,"createdAt":now()})))
 }
-async fn my_order(State(s):State<AppState>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
-    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE access_token=?").bind(q.token.trim()).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found. Check the saved order on this device."))?;
+fn bearer_token(headers:&HeaderMap)->Option<&str>{
+    headers.get(header::AUTHORIZATION).and_then(|v|v.to_str().ok()).and_then(|v|v.strip_prefix("Bearer ")).map(str::trim).filter(|v|!v.is_empty())
+}
+async fn my_order(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
+    let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE access_token=?").bind(token).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found. Check the saved order on this device."))?;
     Ok(Json(with_messages(&s.pool,order_json(&row)).await?))
 }
-async fn cancel_order(State(s):State<AppState>,Path(id):Path<i64>,Query(q):Query<TokenQuery>)->Result<Json<Value>,ApiError>{
+async fn cancel_order(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>)->Result<Json<Value>,ApiError>{
+    let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;
     let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
-    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(q.token.trim()).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(token).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
     let status:String=row.try_get("status").unwrap_or_default();
     if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
     let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
