@@ -670,3 +670,28 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
  .admin-form-wrap input:not([type=file]),.admin-form-wrap textarea,.admin-form-wrap select{position:relative!important;z-index:2!important;display:block!important;width:100%!important;min-height:48px!important;font-size:16px!important;touch-action:auto!important;pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;-webkit-appearance:auto!important;appearance:auto!important}
  .admin-form-wrap label{position:relative!important;overflow:visible!important;transform:none!important;animation:none!important}
 }
+
+
+/* Buyer delivery form: native iOS keyboard owns focus and scrolling. */
+html:has(body.checkout-active), body.checkout-active { scroll-behavior: auto !important; }
+body.checkout-active .main-view,
+body.checkout-active .checkout-layout,
+body.checkout-active .form-panel { scroll-behavior: auto !important; }
+body.checkout-active .form-panel input:not([type=radio]),
+body.checkout-active .form-panel textarea { scroll-margin: 12px 0 !important; }
+body.checkout-active .checkout-order-bar { transition: none !important; }
+body.checkout-active .checkout-order-bar .primary-button { background: #000 !important; border-color: #000 !important; color: #fff !important; }
+body.checkout-active .checkout-heading h1 { letter-spacing: -.055em; }
+body.checkout-active .checkout-heading p { max-width: 38rem; }
+body.checkout-active .form-panel { background: #fff !important; }
+body.checkout-active .form-panel > label { color: #424245 !important; font-size: 13px !important; font-weight: 550 !important; }
+body.checkout-active .form-panel input:not([type=radio]),
+body.checkout-active .form-panel textarea { border-radius: 12px !important; background: #fff !important; font-size: 16px !important; }
+body.checkout-active .form-panel input::placeholder,
+body.checkout-active .form-panel textarea::placeholder { color: #8a8a90 !important; opacity: 1; }
+@media(max-width:760px) {
+ body.checkout-active .checkout-layout { padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+ body.checkout-active .form-panel { gap: 18px !important; }
+ body.checkout-active .checkout-order-bar { bottom: calc(8px + env(safe-area-inset-bottom)) !important; }
+ body.checkout-active.keyboard-open .checkout-order-bar { bottom: calc(8px + env(safe-area-inset-bottom)) !important; }
+}
