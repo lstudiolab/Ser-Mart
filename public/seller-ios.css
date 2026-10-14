@@ -183,3 +183,22 @@ body.admin-body:has(.seller-editor-page) {
   html:has(.seller-editor-page) { scroll-behavior: auto !important; }
   .seller-editor-page, .seller-editor-page * { animation: none !important; transition: none !important; }
 }
+
+
+/* iOS keyboard recovery: native focus and text editing for all seller inputs, not only Description. */
+html, body { -webkit-text-size-adjust: 100%; }
+.seller-editor-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.seller-editor-page textarea,
+.seller-editor-page select,
+#admin-view input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+#admin-view textarea,
+#admin-view select,
+#admin-view [contenteditable="true"] {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-user-modify: read-write !important;
+  caret-color: #1d1d1f !important;
+  font-size: 16px !important;
+}
