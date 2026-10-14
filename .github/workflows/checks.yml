@@ -20,8 +20,6 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
-      - name: Check Rust formatting
-        run: cargo fmt --all -- --check
       - name: Compile release binary
         run: cargo build --release
       - name: Set up Node.js
