@@ -1,3 +1,4 @@
+use argon2::{password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString}, Argon2};
 use axum::{
     body::Body, extract::{DefaultBodyLimit, Path, Query, State}, http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode, Request},
     middleware::{self, Next}, response::{IntoResponse, Response}, routing::{get, patch, post, put}, Json, Router,
@@ -25,6 +26,20 @@ impl IntoResponse for ApiError {
 }
 #[derive(Deserialize)]
 struct Login { password: String }
+#[derive(Deserialize)]
+struct RegisterInput { name: String, email: String, password: String }
+#[derive(Deserialize)]
+struct CustomerLoginInput { email: String, password: String }
+#[derive(Deserialize)]
+struct CustomerProfileInput {
+    #[serde(default)] name: String,
+    #[serde(default)] phone: String,
+    #[serde(default)] address: String,
+    #[serde(rename="exactPlace", default)] exact_place: String,
+    #[serde(default)] request: String,
+    #[serde(rename="primaryPayment", default="default_primary_payment")] primary_payment: String,
+}
+fn default_primary_payment() -> String { "COD".to_string() }
 #[derive(Deserialize)]
 struct ProductInput {
     name: String, #[serde(default)] description: String, price: f64, #[serde(rename="oldPrice", default)] old_price: f64, #[serde(rename="isPreOrder", default)] is_pre_order: bool, #[serde(default)] stock: i64,
@@ -74,11 +89,17 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
             selections TEXT NOT NULL DEFAULT '[]', category TEXT NOT NULL DEFAULT 'Other', release_date TEXT NOT NULL DEFAULT '', is_pre_order BIGINT NOT NULL DEFAULT 0, is_active BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL
         )"),
         format!("CREATE TABLE IF NOT EXISTS ser_mart_orders (
-            id {id}, customer_name TEXT NOT NULL, contact_number TEXT NOT NULL, address TEXT NOT NULL,
+            id {id}, customer_id BIGINT, customer_name TEXT NOT NULL, contact_number TEXT NOT NULL, address TEXT NOT NULL,
             exact_place TEXT NOT NULL DEFAULT '', request TEXT NOT NULL DEFAULT '', payment_method TEXT NOT NULL,
             items TEXT NOT NULL, total DOUBLE PRECISION NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'Pending',
             access_token TEXT NOT NULL UNIQUE, delivery_eta TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
         )"),
+        format!("CREATE TABLE IF NOT EXISTS ser_mart_customers (
+            id {id}, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+            phone TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', exact_place TEXT NOT NULL DEFAULT '',
+            request TEXT NOT NULL DEFAULT '', primary_payment TEXT NOT NULL DEFAULT 'COD', created_at TEXT NOT NULL
+        )"),
+        "CREATE TABLE IF NOT EXISTS ser_mart_customer_sessions (token TEXT PRIMARY KEY, customer_id BIGINT NOT NULL, expires_at BIGINT NOT NULL, created_at TEXT NOT NULL)".to_string(),
         format!("CREATE TABLE IF NOT EXISTS ser_mart_order_messages (
             id {id}, order_id BIGINT NOT NULL, sender TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL
         )"),
@@ -89,9 +110,12 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         "CREATE TABLE IF NOT EXISTS ser_mart_search_terms (term TEXT PRIMARY KEY, search_count BIGINT NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)".to_string(),
         "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
+        "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_customer ON ser_mart_orders(customer_id)".to_string(),
+        "CREATE INDEX IF NOT EXISTS idx_ser_mart_customer_sessions_customer ON ser_mart_customer_sessions(customer_id)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
     ];
     for statement in sql { sqlx::query(&statement).execute(pool).await?; }
+    let _ = sqlx::query("ALTER TABLE ser_mart_orders ADD COLUMN customer_id BIGINT").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN release_date TEXT NOT NULL DEFAULT ''").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN old_price DOUBLE PRECISION NOT NULL DEFAULT 0").execute(pool).await;
@@ -242,6 +266,102 @@ async fn login(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<Login
     sessions.retain(|_,expiry|*expiry>epoch()); sessions.insert(token.clone(),epoch()+8*60*60);
     Ok(Json(json!({"token":token,"expiresIn":28800})))
 }
+async fn account_json(pool: &AnyPool, customer_id: i64) -> Result<Value, ApiError> {
+    let row = sqlx::query("SELECT id,name,email,phone,address,exact_place,request,primary_payment,created_at FROM ser_mart_customers WHERE id=?")
+        .bind(customer_id).fetch_optional(pool).await.map_err(|_| ApiError::internal())?
+        .ok_or_else(|| ApiError::auth())?;
+    Ok(json!({
+        "id": row.try_get::<i64,_>("id").unwrap_or_default(),
+        "name": row.try_get::<String,_>("name").unwrap_or_default(),
+        "email": row.try_get::<String,_>("email").unwrap_or_default(),
+        "phone": row.try_get::<String,_>("phone").unwrap_or_default(),
+        "address": row.try_get::<String,_>("address").unwrap_or_default(),
+        "exactPlace": row.try_get::<String,_>("exact_place").unwrap_or_default(),
+        "request": row.try_get::<String,_>("request").unwrap_or_default(),
+        "primaryPayment": row.try_get::<String,_>("primary_payment").unwrap_or_else(|_| "COD".into()),
+        "createdAt": row.try_get::<String,_>("created_at").unwrap_or_default()
+    }))
+}
+async fn customer_id_for_token(pool: &AnyPool, token: &str) -> Result<Option<i64>, ApiError> {
+    let row = sqlx::query("SELECT customer_id FROM ser_mart_customer_sessions WHERE token=? AND expires_at>?")
+        .bind(token).bind(epoch() as i64).fetch_optional(pool).await.map_err(|_| ApiError::internal())?;
+    Ok(row.map(|r| r.try_get::<i64,_>("customer_id").unwrap_or_default()))
+}
+async fn customer_id_from_headers(pool: &AnyPool, headers: &HeaderMap) -> Result<i64, ApiError> {
+    let token = bearer_token(headers).ok_or_else(ApiError::auth)?;
+    customer_id_for_token(pool, token).await?.ok_or_else(ApiError::auth)
+}
+async fn create_customer_session(pool: &AnyPool, customer_id: i64) -> Result<String, ApiError> {
+    let token = Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO ser_mart_customer_sessions(token,customer_id,expires_at,created_at) VALUES(?,?,?,?)")
+        .bind(token.clone()).bind(customer_id).bind((epoch()+30*24*60*60) as i64).bind(now())
+        .execute(pool).await.map_err(|_| ApiError::internal())?;
+    Ok(token)
+}
+async fn account_register(State(s): State<AppState>, Json(input): Json<RegisterInput>) -> Result<Json<Value>, ApiError> {
+    let name = input.name.trim();
+    let email = input.email.trim().to_lowercase();
+    if name.chars().count() < 2 || name.chars().count() > 100 { return Err(ApiError::bad("Enter a name between 2 and 100 characters.")); }
+    if email.len() > 254 || !email.contains('@') || email.starts_with('@') || email.ends_with('@') || email.contains(' ') { return Err(ApiError::bad("Enter a valid email address.")); }
+    if input.password.chars().count() < 8 || input.password.chars().count() > 128 { return Err(ApiError::bad("Your password must be between 8 and 128 characters.")); }
+    let duplicate = sqlx::query("SELECT id FROM ser_mart_customers WHERE email=?").bind(email.clone()).fetch_optional(&s.pool).await.map_err(|_| ApiError::internal())?;
+    if duplicate.is_some() { return Err(ApiError::bad("An account with this email already exists. Sign in instead.")); }
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default().hash_password(input.password.as_bytes(), &salt).map_err(|_| ApiError::internal())?.to_string();
+    let row = sqlx::query("INSERT INTO ser_mart_customers(name,email,password_hash,created_at) VALUES(?,?,?,?) RETURNING id")
+        .bind(name.to_string()).bind(email).bind(hash).bind(now()).fetch_one(&s.pool).await
+        .map_err(|_| ApiError::bad("An account with this email may already exist. Try signing in."))?;
+    let id: i64 = row.try_get("id").map_err(|_| ApiError::internal())?;
+    let token = create_customer_session(&s.pool, id).await?;
+    Ok(Json(json!({"token":token,"expiresIn":30*24*60*60,"account":account_json(&s.pool,id).await?})))
+}
+async fn account_login(State(s): State<AppState>, headers: HeaderMap, Json(input): Json<CustomerLoginInput>) -> Result<Json<Value>, ApiError> {
+    let key = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("unknown").to_string();
+    let ts = epoch();
+    { let mut attempts=s.login_attempts.lock().map_err(|_|ApiError::internal())?; attempts.retain(|_,(_,until)|*until>ts); if let Some((count,until))=attempts.get(&key) { if *count>=8 && *until>ts { return Err(ApiError(StatusCode::TOO_MANY_REQUESTS,"Too many sign-in attempts. Please wait 15 minutes.".into())); } } }
+    let email = input.email.trim().to_lowercase();
+    let row = sqlx::query("SELECT id,password_hash FROM ser_mart_customers WHERE email=?").bind(email).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let valid = if let Some(ref user) = row {
+        let hash: String = user.try_get("password_hash").unwrap_or_default();
+        PasswordHash::new(&hash).ok().is_some_and(|parsed| Argon2::default().verify_password(input.password.as_bytes(), &parsed).is_ok())
+    } else { false };
+    if !valid {
+        let mut attempts=s.login_attempts.lock().map_err(|_|ApiError::internal())?;
+        let entry=attempts.entry(key.clone()).or_insert((0,ts+900)); if entry.1<=ts { *entry=(0,ts+900); } entry.0=entry.0.saturating_add(1);
+        return Err(ApiError(StatusCode::UNAUTHORIZED,"Email or password is incorrect.".into()));
+    }
+    if let Ok(mut attempts)=s.login_attempts.lock(){attempts.remove(&key);}
+    let id: i64 = row.ok_or_else(ApiError::auth)?.try_get("id").map_err(|_|ApiError::internal())?;
+    let token = create_customer_session(&s.pool, id).await?;
+    Ok(Json(json!({"token":token,"expiresIn":30*24*60*60,"account":account_json(&s.pool,id).await?})))
+}
+async fn account_me(State(s): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let id = customer_id_from_headers(&s.pool, &headers).await?;
+    Ok(Json(account_json(&s.pool,id).await?))
+}
+async fn account_update(State(s): State<AppState>, headers: HeaderMap, Json(input): Json<CustomerProfileInput>) -> Result<Json<Value>, ApiError> {
+    let id = customer_id_from_headers(&s.pool, &headers).await?;
+    let name = input.name.trim();
+    if name.chars().count() < 2 || name.chars().count() > 100 { return Err(ApiError::bad("Enter a name between 2 and 100 characters.")); }
+    if !["COD","GCash","COP"].contains(&input.primary_payment.as_str()) { return Err(ApiError::bad("Choose a valid primary payment method.")); }
+    if input.phone.len()>40 || input.address.len()>500 || input.exact_place.len()>250 || input.request.len()>1000 { return Err(ApiError::bad("One of your delivery fields is too long.")); }
+    sqlx::query("UPDATE ser_mart_customers SET name=?,phone=?,address=?,exact_place=?,request=?,primary_payment=? WHERE id=?")
+        .bind(name.to_string()).bind(input.phone.trim().to_string()).bind(input.address.trim().to_string()).bind(input.exact_place.trim().to_string()).bind(input.request.trim().to_string()).bind(input.primary_payment).bind(id)
+        .execute(&s.pool).await.map_err(|_| ApiError::internal())?;
+    Ok(Json(account_json(&s.pool,id).await?))
+}
+async fn account_logout(State(s): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let token = bearer_token(&headers).ok_or_else(ApiError::auth)?;
+    sqlx::query("DELETE FROM ser_mart_customer_sessions WHERE token=?").bind(token).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!({"ok":true})))
+}
+async fn account_orders(State(s): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
+    let id = customer_id_from_headers(&s.pool, &headers).await?;
+    let rows = sqlx::query("SELECT * FROM ser_mart_orders WHERE customer_id=? ORDER BY id DESC").bind(id).fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
+    let mut orders = Vec::new();
+    for row in rows { orders.push(with_messages(&s.pool, order_json(&row)).await?); }
+    Ok(Json(json!(orders)))
+}
 async fn admin_products(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value>,ApiError>{
     if !admin_ok(&headers,&s){return Err(ApiError::auth());}
     let rows=sqlx::query("SELECT * FROM ser_mart_products ORDER BY id DESC").fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
@@ -388,6 +508,7 @@ async fn get_seller_info(State(s):State<AppState>)->Result<Json<Value>,ApiError>
 async fn admin_seller_info(State(s):State<AppState>,h:HeaderMap)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}get_seller_info(State(s)).await}
 async fn update_seller_info(State(s):State<AppState>,h:HeaderMap,Json(i):Json<SellerInfoInput>)->Result<Json<Value>,ApiError>{if !admin_ok(&h,&s){return Err(ApiError::auth());}sqlx::query("INSERT INTO ser_mart_seller_profile (id,name,phone,gcash_number,gcash_name,pickup_address,updated_at) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,phone=excluded.phone,gcash_number=excluded.gcash_number,gcash_name=excluded.gcash_name,pickup_address=excluded.pickup_address,updated_at=excluded.updated_at").bind(i.name.trim()).bind(i.phone.trim()).bind(i.gcash_number.trim()).bind(i.gcash_name.trim()).bind(i.pickup_address.trim()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;get_seller_info(State(s)).await}
 async fn create_order(State(s):State<AppState>,headers:HeaderMap,Json(input):Json<OrderInput>)->Result<Json<Value>,ApiError>{
+    let customer_id = customer_id_from_headers(&s.pool, &headers).await?;
     if input.customer_name.trim().is_empty(){return Err(ApiError::bad("Please enter your name."));}
     if input.contact_number.trim().is_empty(){return Err(ApiError::bad("Please enter your contact number."));}
     if input.address.trim().is_empty(){return Err(ApiError::bad("Please enter your address."));}
@@ -408,8 +529,8 @@ async fn create_order(State(s):State<AppState>,headers:HeaderMap,Json(input):Jso
         snapshots.push(json!({"productId":line.product_id,"name":p["name"],"imageUrl":p["imageUrl"],"unitPrice":unit,"basePrice":p["price"],"quantity":line.quantity,"isPreOrder":p["isPreOrder"],"selections":opts,"subtotal":subtotal}));
     }
     let access=Uuid::new_v4().to_string(); let items=serde_json::to_string(&snapshots).map_err(|_|ApiError::internal())?;
-    let row=sqlx::query("INSERT INTO ser_mart_orders (customer_name,contact_number,address,exact_place,request,payment_method,items,total,status,access_token,delivery_eta,created_at) VALUES (?,?,?,?,?,?,?,?,'Pending',?,'',?) RETURNING id")
-        .bind(input.customer_name.trim().to_string()).bind(input.contact_number.trim().to_string()).bind(input.address.trim().to_string()).bind(input.exact_place.trim().to_string()).bind(input.request.trim().to_string()).bind(input.payment_method).bind(items).bind(total).bind(access.clone()).bind(now())
+    let row=sqlx::query("INSERT INTO ser_mart_orders (customer_id,customer_name,contact_number,address,exact_place,request,payment_method,items,total,status,access_token,delivery_eta,created_at) VALUES (?,?,?,?,?,?,?,?,?,'Pending',?,'',?) RETURNING id")
+        .bind(customer_id).bind(input.customer_name.trim().to_string()).bind(input.contact_number.trim().to_string()).bind(input.address.trim().to_string()).bind(input.exact_place.trim().to_string()).bind(input.request.trim().to_string()).bind(input.payment_method).bind(items).bind(total).bind(access.clone()).bind(now())
         .fetch_one(&mut *tx).await.map_err(|_|ApiError::internal())?;
     let id:i64=row.try_get("id").map_err(|_|ApiError::internal())?;
     for (pid,qty) in counts {let changed=sqlx::query("UPDATE ser_mart_products SET stock=stock-? WHERE id=? AND stock>=? AND is_active=1").bind(qty).bind(pid).bind(qty).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;if changed.rows_affected()==0{return Err(ApiError::bad("Stock changed while you were checking out. Please refresh your cart and try again."));}}
@@ -427,8 +548,12 @@ async fn my_order(State(s):State<AppState>,headers:HeaderMap)->Result<Json<Value
 }
 async fn cancel_order(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i64>)->Result<Json<Value>,ApiError>{
     let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;
+    let account_id=customer_id_for_token(&s.pool,token).await?;
     let mut tx=s.pool.begin().await.map_err(|_|ApiError::internal())?;
-    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(token).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
+    let order_token:String=row.try_get("access_token").unwrap_or_default();
+    let owner_id:Option<i64>=row.try_get("customer_id").ok();
+    if order_token!=token && (account_id.is_none() || owner_id!=account_id) { return Err(ApiError::auth()); }
     let status:String=row.try_get("status").unwrap_or_default();
     if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
     let created:String=row.try_get("created_at").unwrap_or_default();
@@ -479,7 +604,15 @@ async fn send_message(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i
     let text=input.text.trim();if text.is_empty(){return Err(ApiError::bad("Write a message first."));}if text.len()>2000{return Err(ApiError::bad("Messages must be under 2,000 characters."));}
     let seller=admin_ok(&headers,&s);
     if seller {let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::missing("Order not found."));}}
-    else {let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;let found=sqlx::query("SELECT id FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(token).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;if found.is_none(){return Err(ApiError::auth());}}
+    else {
+        let token=bearer_token(&headers).ok_or_else(ApiError::auth)?;
+        let order=sqlx::query("SELECT access_token,customer_id FROM ser_mart_orders WHERE id=?").bind(id).fetch_optional(&s.pool).await.map_err(|_|ApiError::internal())?;
+        let Some(order)=order else { return Err(ApiError::missing("Order not found.")); };
+        let access:String=order.try_get("access_token").unwrap_or_default();
+        let owner:Option<i64>=order.try_get("customer_id").ok();
+        let account_id=customer_id_for_token(&s.pool,token).await?;
+        if access!=token && (account_id.is_none() || owner!=account_id) { return Err(ApiError::auth()); }
+    }
     sqlx::query("INSERT INTO ser_mart_order_messages(order_id,sender,text,created_at) VALUES(?,?,?,?)").bind(id).bind(if seller{"seller"}else{"customer"}).bind(text.to_string()).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
@@ -495,6 +628,9 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let app=Router::new()
         .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin)).route("/seller",get(html_admin)).route("/seller/",get(html_admin))
         .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
+        .route("/api/account/register",post(account_register)).route("/api/account/login",post(account_login))
+        .route("/api/account/me",get(account_me)).route("/api/account/profile",put(account_update))
+        .route("/api/account/logout",post(account_logout)).route("/api/account/orders",get(account_orders))
         .route("/api/search-trends",get(search_trends).post(record_search))
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
