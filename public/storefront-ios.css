@@ -1356,3 +1356,58 @@ body:not(.admin-body) img { max-width: 100%; }
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Product image URLs are root-resolved; failed media keeps a clean reserved surface. */
+body:not(.admin-body) .ser-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 120px;
+  height: 100%;
+  padding: 18px;
+  color: #747780;
+  background: #f3f4f6;
+  font-size: 13px;
+  text-align: center;
+}
+body:not(.admin-body) .detail-photo .ser-image-fallback {
+  min-height: 320px;
+  height: 100%;
+  border-radius: 24px;
+}
+body:not(.admin-body) .category-image-wrap .ser-image-fallback {
+  min-height: 100%;
+  border-radius: inherit;
+}
+/* Keep the Buy now action above the bottom navigation and make it monochrome. */
+body:not(.admin-body) .detail-actions {
+  bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+  z-index: 50 !important;
+  padding: 10px 14px !important;
+  border: 1px solid rgba(0,0,0,.08) !important;
+  border-radius: 22px !important;
+  background: rgba(255,255,255,.96) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,.12) !important;
+}
+body:not(.admin-body) .detail-actions .detail-buy-now,
+body:not(.admin-body) .detail-actions .primary-button {
+  background: #000 !important;
+  border-color: #000 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+body:not(.admin-body) .detail-screen { padding-bottom: 160px !important; }
+@media (max-width: 760px) {
+  body:not(.admin-body) .detail-actions {
+    bottom: calc(92px + env(safe-area-inset-bottom)) !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 8px 10px !important;
+  }
+  body:not(.admin-body) .detail-screen { padding-bottom: 170px !important; }
+}
