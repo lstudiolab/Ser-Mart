@@ -267,3 +267,10 @@ body.admin-body #admin-view select {
   transform: none !important;
 }
 body.admin-body #admin-view textarea { min-height: 112px !important; }
+
+
+/* Seller product flags stay comfortable to tap on mobile. */
+body.admin-body .preorder-editor-toggle{display:flex;flex-direction:column;gap:7px;padding:13px 15px;border-radius:17px;background:#f1f3f7;grid-column:span 1}
+body.admin-body .preorder-editor-toggle>span{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600}
+body.admin-body .preorder-editor-toggle input{width:20px;height:20px;accent-color:#087bff}
+body.admin-body .preorder-editor-toggle small{font-size:12px;line-height:1.4;color:#747984}
