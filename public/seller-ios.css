@@ -198,7 +198,6 @@ html, body { -webkit-text-size-adjust: 100%; }
   pointer-events: auto !important;
   -webkit-user-select: text !important;
   user-select: text !important;
-  -webkit-user-modify: read-write !important;
   caret-color: #1d1d1f !important;
   font-size: 16px !important;
 }
@@ -222,3 +221,49 @@ html, body { -webkit-text-size-adjust: 100%; }
 
 /* Keep native iOS editing enabled; avoid gesture overrides on seller controls. */
 body.admin-body input:not([type=checkbox]):not([type=radio]):not([type=file]), body.admin-body textarea, body.admin-body select { touch-action: auto !important; -webkit-user-select: text !important; user-select: text !important; -webkit-transform: none !important; transform: none !important; }
+
+
+/* Native iOS keyboard compatibility: do not force WebKit's content-editing mode
+   onto native input/textarea/select controls. Keep it only for contenteditable text. */
+#admin-view [contenteditable="true"],
+.seller-editor-page [contenteditable="true"] {
+  -webkit-user-modify: read-write-plaintext-only !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+body.admin-body #admin-view,
+body.admin-body #admin-view .seller-editor-page,
+body.admin-body #admin-view .seller-editor-page .admin-editor,
+body.admin-body #admin-view .seller-editor-page .admin-form,
+body.admin-body #admin-view .seller-editor-page .admin-form label {
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+  will-change: auto !important;
+}
+body.admin-body #admin-view .seller-editor-page .admin-form {
+  overflow: visible !important;
+}
+body.admin-body #admin-view input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.admin-body #admin-view textarea,
+body.admin-body #admin-view select {
+  position: relative !important;
+  z-index: 3 !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  caret-color: #1d1d1f !important;
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-transform: none !important;
+  transform: none !important;
+}
+body.admin-body #admin-view textarea { min-height: 112px !important; }
