@@ -315,7 +315,18 @@ async fn create_customer_session(pool: &AnyPool, customer_id: i64) -> Result<Str
         .execute(pool).await.map_err(|_| ApiError::internal())?;
     Ok(token)
 }
-async fn account_register(State(s): State<AppState>, Json(input): Json<RegisterInput>) -> Result<Json<Value>, ApiError> {
+async fn account_register(State(s): State<AppState>, headers: HeaderMap, Json(input): Json<RegisterInput>) -> Result<Json<Value>, ApiError> {
+    let ip = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').last()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("unknown");
+    let key = format!("register:{}", ip);
+    let ts = epoch();
+    {
+        let mut attempts = s.login_attempts.lock().map_err(|_| ApiError::internal())?;
+        attempts.retain(|_, (_, until)| *until > ts);
+        let entry = attempts.entry(key.clone()).or_insert((0, ts + 900));
+        if entry.1 <= ts { *entry = (0, ts + 900); }
+        if entry.0 >= 8 { return Err(ApiError(StatusCode::TOO_MANY_REQUESTS, "Too many account attempts. Please wait 15 minutes.".into())); }
+        entry.0 = entry.0.saturating_add(1);
+    }
     let name = input.name.trim();
     let email = input.email.trim().to_lowercase();
     if name.chars().count() < 2 || name.chars().count() > 100 { return Err(ApiError::bad("Enter a name between 2 and 100 characters.")); }
@@ -333,7 +344,7 @@ async fn account_register(State(s): State<AppState>, Json(input): Json<RegisterI
     Ok(Json(json!({"token":token,"expiresIn":30*24*60*60,"account":account_json(&s.pool,id).await?})))
 }
 async fn account_login(State(s): State<AppState>, headers: HeaderMap, Json(input): Json<CustomerLoginInput>) -> Result<Json<Value>, ApiError> {
-    let key = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("unknown").to_string();
+    let key = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').last()).map(str::trim).filter(|v| !v.is_empty()).unwrap_or("unknown").to_string();
     let ts = epoch();
     { let mut attempts=s.login_attempts.lock().map_err(|_|ApiError::internal())?; attempts.retain(|_,(_,until)|*until>ts); if let Some((count,until))=attempts.get(&key) { if *count>=8 && *until>ts { return Err(ApiError(StatusCode::TOO_MANY_REQUESTS,"Too many sign-in attempts. Please wait 15 minutes.".into())); } } }
     let email = input.email.trim().to_lowercase();
