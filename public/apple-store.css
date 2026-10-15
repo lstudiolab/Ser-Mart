@@ -359,3 +359,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .payment-choice input{accent-color:#000}
 .count-badge{background:#000}
 .form-panel input:focus,.form-panel textarea:focus,.admin-form input:focus,.admin-form textarea:focus,.admin-form select:focus{border-color:#86868b;box-shadow:0 0 0 2px rgba(0,0,0,.07)}
+
+/* Compact translucent iPhone navigation; leave more of the storefront visible. */
+@media (max-width: 760px) {
+  .bottom-nav {
+    top: auto !important; bottom: max(8px, var(--safe-bottom)) !important; left: 50% !important;
+    right: auto !important; transform: translateX(-50%) !important; display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 2px !important;
+    width: min(calc(100% - 32px), 440px) !important; min-height: 52px !important; height: 52px !important;
+    padding: 4px !important; border: 1px solid rgba(255,255,255,.58) !important; border-radius: 19px !important;
+    background: rgba(250,250,252,.48) !important; box-shadow: 0 5px 18px rgba(0,0,0,.08) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.1) !important; backdrop-filter: blur(14px) saturate(1.1) !important;
+  }
+  .bottom-nav .nav-item { min-height: 42px !important; padding: 3px 2px !important; gap: 2px !important; border-radius: 14px !important; font-size: 9px !important; }
+  .bottom-nav .nav-item svg { width: 17px !important; height: 17px !important; }
+}
