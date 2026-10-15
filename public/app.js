@@ -247,6 +247,7 @@ async function submitOrder(form){
 }
 document.addEventListener('click',async e=>{
 if(e.target.closest('input,textarea,select'))return;
+const preorderQty=e.target.closest('[data-selection-qty]');if(preorderQty&&state.selectedProduct&&state.selectedProduct.isPreOrder){state.selectionQty=1;renderSelection();notice('Pre-orders are limited to one unit.');return;}
 if(e.target.closest('[data-search-back]')){state.search='';state.tab=state.previousTab||'home';state.categoryProfile=state.previousCategoryProfile||'';render();return;}
 const searchTerm=e.target.closest('[data-search-term]');if(searchTerm){state.search=searchTerm.dataset.searchTerm||'';recordSearchTerm(state.search);render();const input=$('#search-input');if(input)input.focus({preventScroll:true});return;}
 const selectCart=e.target.closest('[data-select-cart]');if(selectCart){const line=state.cart[Number(selectCart.dataset.selectCart)];if(line){line.selectedForOrder=!line.selectedForOrder;persistCart();render();}return;}
