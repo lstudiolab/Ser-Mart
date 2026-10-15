@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use sqlx::{any::{install_default_drivers, AnyPoolOptions}, AnyPool, Row};
 use std::{collections::HashMap, env, net::SocketAddr, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 use tower_http::{services::ServeDir, trace::TraceLayer};
@@ -282,10 +283,26 @@ async fn account_json(pool: &AnyPool, customer_id: i64) -> Result<Value, ApiErro
         "createdAt": row.try_get::<String,_>("created_at").unwrap_or_default()
     }))
 }
+fn hash_customer_session_token(token: &str) -> String {
+    format!("{:x}", Sha256::digest(token.as_bytes()))
+}
 async fn customer_id_for_token(pool: &AnyPool, token: &str) -> Result<Option<i64>, ApiError> {
+    let hashed = hash_customer_session_token(token);
     let row = sqlx::query("SELECT customer_id FROM ser_mart_customer_sessions WHERE token=? AND expires_at>?")
+        .bind(hashed).bind(epoch() as i64).fetch_optional(pool).await.map_err(|_| ApiError::internal())?;
+    if let Some(row) = row {
+        return Ok(Some(row.try_get::<i64,_>("customer_id").unwrap_or_default()));
+    }
+    // One-time compatibility migration for sessions created before token hashing was enabled.
+    let legacy = sqlx::query("SELECT customer_id FROM ser_mart_customer_sessions WHERE token=? AND expires_at>?")
         .bind(token).bind(epoch() as i64).fetch_optional(pool).await.map_err(|_| ApiError::internal())?;
-    Ok(row.map(|r| r.try_get::<i64,_>("customer_id").unwrap_or_default()))
+    if let Some(row) = legacy {
+        let customer_id = row.try_get::<i64,_>("customer_id").unwrap_or_default();
+        sqlx::query("UPDATE ser_mart_customer_sessions SET token=? WHERE token=?")
+            .bind(hash_customer_session_token(token)).bind(token).execute(pool).await.map_err(|_| ApiError::internal())?;
+        return Ok(Some(customer_id));
+    }
+    Ok(None)
 }
 async fn customer_id_from_headers(pool: &AnyPool, headers: &HeaderMap) -> Result<i64, ApiError> {
     let token = bearer_token(headers).ok_or_else(ApiError::auth)?;
@@ -294,7 +311,7 @@ async fn customer_id_from_headers(pool: &AnyPool, headers: &HeaderMap) -> Result
 async fn create_customer_session(pool: &AnyPool, customer_id: i64) -> Result<String, ApiError> {
     let token = Uuid::new_v4().to_string();
     sqlx::query("INSERT INTO ser_mart_customer_sessions(token,customer_id,expires_at,created_at) VALUES(?,?,?,?)")
-        .bind(token.clone()).bind(customer_id).bind((epoch()+30*24*60*60) as i64).bind(now())
+        .bind(hash_customer_session_token(&token)).bind(customer_id).bind((epoch()+30*24*60*60) as i64).bind(now())
         .execute(pool).await.map_err(|_| ApiError::internal())?;
     Ok(token)
 }
@@ -352,7 +369,8 @@ async fn account_update(State(s): State<AppState>, headers: HeaderMap, Json(inpu
 }
 async fn account_logout(State(s): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
     let token = bearer_token(&headers).ok_or_else(ApiError::auth)?;
-    sqlx::query("DELETE FROM ser_mart_customer_sessions WHERE token=?").bind(token).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    sqlx::query("DELETE FROM ser_mart_customer_sessions WHERE token=? OR token=?")
+        .bind(hash_customer_session_token(token)).bind(token).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
     Ok(Json(json!({"ok":true})))
 }
 async fn account_orders(State(s): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, ApiError> {
