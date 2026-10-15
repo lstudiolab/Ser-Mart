@@ -232,7 +232,7 @@ async fn save_product(pool:&AnyPool,input:ProductInput,id:Option<i64>)->Result<V
     if input.stock<0{return Err(ApiError::bad("Stock cannot be below zero."));}
     let gallery=serde_json::to_string(&if input.gallery.is_array(){input.gallery}else{json!([])}).map_err(|_|ApiError::internal())?;
     let selections=serde_json::to_string(&if input.selections.is_array(){input.selections}else{json!([])}).map_err(|_|ApiError::internal())?;
-    let active=if input.is_active{1_i64}else{0_i64};
+    let active=1_i64; // Stock changes never hide an item; only the explicit delete action removes it.
     let product_id=if let Some(id)=id{
         let r=sqlx::query("UPDATE ser_mart_products SET name=?,description=?,price=?,stock=?,image_url=?,gallery=?,selections=?,category=?,release_date=?,is_active=? WHERE id=?")
             .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(input.category).bind(input.release_date).bind(active).bind(id)
