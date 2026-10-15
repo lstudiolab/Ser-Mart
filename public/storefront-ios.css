@@ -1617,3 +1617,14 @@ body:not(.admin-body) .detail-option-row>strong small{font-size:11px;font-weight
 body:not(.admin-body) .detail-option-tags{display:flex;flex-wrap:wrap;gap:7px}
 body:not(.admin-body) .detail-option-tag{display:inline-flex;align-items:center;gap:4px;padding:8px 12px;border-radius:999px;background:#f0f1f4;color:#32343a;font-size:12px;font-weight:520}
 body:not(.admin-body) .detail-option-tag small{color:#087bff;font-size:11px}
+
+body:not(.admin-body) .preorder-label{display:inline-flex;align-self:flex-start;margin:-3px 22px 12px;padding:6px 9px;border-radius:999px;background:rgba(8,123,255,.1);color:#087bff;font-size:10px;font-weight:720;letter-spacing:.08em}
+body:not(.admin-body) .cart-preorder-tag{display:inline-flex;padding:4px 7px;border-radius:999px;background:rgba(8,123,255,.1);color:#087bff;font-size:9px;font-weight:720;letter-spacing:.04em}
+body:not(.admin-body) .preorder-list{display:flex;flex-direction:column;gap:11px}
+body:not(.admin-body) .preorder-order-card{display:flex;align-items:center;gap:13px;padding:12px;border-radius:22px;background:#f1f2f5}
+body:not(.admin-body) .preorder-card-image{width:76px;height:76px;flex:0 0 76px;border-radius:16px;background:#e4e5e9;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#7b7e87}
+body:not(.admin-body) .preorder-card-image img{width:100%;height:100%;object-fit:cover}
+body:not(.admin-body) .preorder-order-card>div:last-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+body:not(.admin-body) .preorder-order-card strong{font-size:14px;line-height:1.25}
+body:not(.admin-body) .preorder-order-card p{margin:0;color:#737780;font-size:12px}
+body:not(.admin-body) .preorder-order-card span{font-size:13px;font-weight:650}
