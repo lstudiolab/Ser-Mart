@@ -22,8 +22,17 @@ if(window.visualViewport){
   window.visualViewport.addEventListener('scroll',syncKeyboardViewport,{passive:true});
 }
 window.addEventListener('resize',syncKeyboardViewport,{passive:true});
-document.addEventListener('focusin',()=>{syncKeyboardViewport();});
-document.addEventListener('focusout',()=>window.setTimeout(syncKeyboardViewport,80));
+const checkoutTextFieldSelector='#checkout-form input:not([type="radio"]):not([type="checkbox"]), #checkout-form textarea';
+function isCheckoutTextField(el){return !!el&&typeof el.matches==='function'&&el.matches(checkoutTextFieldSelector);}
+document.addEventListener('focusin',e=>{
+  if(isCheckoutTextField(e.target))document.body.classList.add('checkout-field-focused');
+  else document.body.classList.remove('checkout-field-focused');
+  syncKeyboardViewport();
+});
+document.addEventListener('focusout',()=>window.setTimeout(()=>{
+  if(!isCheckoutTextField(document.activeElement))document.body.classList.remove('checkout-field-focused');
+  syncKeyboardViewport();
+},150));
 
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function money(v){return '₱'+Number(v||0).toLocaleString('en-PH',{maximumFractionDigits:2});}
@@ -70,7 +79,7 @@ const sections=groups.map(name=>{const items=state.products.filter(product=>prod
 const unassigned=state.products.filter(product=>!groups.includes(productCategory(product)));
 view.innerHTML='<section class="page-heading"><span class="eyebrow">The full collection</span><h1>All items</h1><p>Browse the sections created by the seller.</p></section>'+sections+(unassigned.length?'<section class="all-items-group unassigned-items"><div class="section-heading"><h2>Needs a section</h2><span class="muted small">'+unassigned.length+' items</span></div>'+grid(unassigned)+'</section>':'')+(!sections&&!unassigned.length?'<div class="category-empty-state">The seller has not added any items yet.</div>':'');
 }
-function render(){removeBars();nav.hidden=state.checkout||state.detail||state.tab==='orders';$('#topbar').hidden=state.checkout||state.detail;document.body.classList.toggle('checkout-active',state.checkout);document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));$('#cart-count').textContent=String(cartCount());if(state.detail)return;
+function render(){removeBars();nav.hidden=state.checkout||state.detail||state.tab==='orders';$('#topbar').hidden=state.checkout||state.detail;document.body.classList.toggle('checkout-active',state.checkout);if(!state.checkout)document.body.classList.remove('checkout-field-focused');document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));$('#cart-count').textContent=String(cartCount());if(state.detail)return;
 if(state.checkout){renderCheckout();const bar=document.createElement('div');bar.className='checkout-order-bar';bar.innerHTML='<div><span class="muted small">Receipt total</span><strong>'+money(cartTotal())+'</strong></div><button class="primary-button" id="checkout-submit" type="submit" form="checkout-form">Place order '+svg('arrow')+'</button>';document.body.appendChild(bar);}
 else if(state.tab==='home')renderHome();else if(state.tab==='category')renderCategoryProfile();else if(state.tab==='all')renderAll();else if(state.tab==='search')renderSearch();else if(state.tab==='orders')renderOrders();else if(state.tab==='cart'){renderCart();if(state.cart.length){const bar=document.createElement('div');bar.className='cart-order-bar';bar.innerHTML='<div><span class="muted small">Total</span><strong>'+money(cartTotal())+'</strong></div><button class="primary-button" type="button" id="order-all">Order all '+svg('arrow')+'</button>';document.body.appendChild(bar);}}else renderHome();}
 async function loadProducts(){try{state.products=await api('/api/products');}catch(_){state.products=[];notice('The store could not refresh. Open it again in a moment.');}}
