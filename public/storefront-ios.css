@@ -1163,3 +1163,43 @@ body:not(.admin-body) .detail-actions .detail-buy-now {
   body:not(.admin-body) .cart-order-bar,
   body:not(.admin-body) .detail-actions { transition: none !important; }
 }
+
+
+/* One consistent native editing contract for every buyer-side text field. */
+body:not(.admin-body) .search-field,
+body:not(.admin-body) .message-form,
+body:not(.admin-body) .admin-chat-form {
+  transform: none !important;
+  filter: none !important;
+  perspective: none !important;
+  contain: none !important;
+}
+body:not(.admin-body) input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+body:not(.admin-body) textarea,
+body:not(.admin-body) select,
+body:not(.admin-body) [contenteditable="true"] {
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  color: #1d1d1f !important;
+  caret-color: #1d1d1f !important;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-transform: none !important;
+  transform: none !important;
+}
+body:not(.admin-body) input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+body:not(.admin-body) textarea,
+body:not(.admin-body) select {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  -webkit-appearance: auto !important;
+  appearance: auto !important;
+}
+body:not(.admin-body) input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]):not([type="file"]):focus,
+body:not(.admin-body) textarea:focus,
+body:not(.admin-body) select:focus {
+  position: relative !important;
+  z-index: 4 !important;
+}
