@@ -1650,3 +1650,8 @@ body:not(.admin-body) .cart-row-info .quantity-control{margin-top:3px}
  body:not(.admin-body) .cart-side-price{font-size:11px}
  body:not(.admin-body) .cart-actions{gap:8px}
 }
+body:not(.admin-body) .primary-payment-panel{align-items:flex-start}
+body:not(.admin-body) .primary-payment-choices{display:flex;flex-direction:column;align-items:stretch;gap:10px;margin-top:13px}
+body:not(.admin-body) .primary-payment-choices label{display:flex;align-items:center;gap:9px;min-height:36px;font-size:13px;color:#25272d}
+body:not(.admin-body) .primary-payment-choices input{width:18px;height:18px;accent-color:#087bff}
+body:not(.admin-body) .primary-payment-choices .primary-button{align-self:flex-start;margin-top:4px}
