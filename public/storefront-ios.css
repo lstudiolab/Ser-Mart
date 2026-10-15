@@ -1673,3 +1673,10 @@ body:not(.admin-body) #primary-payment-form{border:0;align-items:start}
 body:not(.admin-body) #primary-payment-form .primary-payment-choices{display:grid;gap:12px}
 body:not(.admin-body) #primary-payment-form .primary-button{border-radius:999px}
 @media(max-width:520px){body:not(.admin-body) .account-login-card{border-radius:28px;padding:20px}body:not(.admin-body) .account-profile-edit{padding:18px}}
+
+
+/* First-load screen: black canvas, restrained blue progress accent. */
+body:not(.admin-body):has(.main-view > .loading-state){background:#050507!important;color:#f5f7ff!important}
+body:not(.admin-body):has(.main-view > .loading-state) .main-view{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;width:100%;max-width:none;margin:0;padding:0;background:#050507!important}
+body:not(.admin-body):has(.main-view > .loading-state) .loading-state{width:100%;min-height:100dvh;gap:12px;background:#050507;color:#8b93a4}
+body:not(.admin-body):has(.main-view > .loading-state) .loading-ring{width:20px;height:20px;border-color:#1b263b;border-top-color:#087bff}
