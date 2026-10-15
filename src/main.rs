@@ -450,6 +450,11 @@ async fn cancel_order(State(s):State<AppState>,headers:HeaderMap,Path(id):Path<i
     let row=sqlx::query("SELECT * FROM ser_mart_orders WHERE id=? AND access_token=?").bind(id).bind(token).fetch_optional(&mut *tx).await.map_err(|_|ApiError::internal())?.ok_or_else(||ApiError::missing("Order not found."))?;
     let status:String=row.try_get("status").unwrap_or_default();
     if status!="Pending"{return Err(ApiError::bad("Only pending orders can be cancelled. Message the seller if you need help."));}
+    let created:String=row.try_get("created_at").unwrap_or_default();
+    let created_at=chrono::DateTime::parse_from_rfc3339(&created).map_err(|_|ApiError::bad("This order's creation time could not be verified. Please message the seller."))?;
+    if chrono::Utc::now().signed_duration_since(created_at.with_timezone(&chrono::Utc)).num_seconds() >= 3600 {
+        return Err(ApiError::bad("The one-hour cancellation window has ended. Please message the seller for help."));
+    }
     let items=parse_json(row.try_get("items").unwrap_or_else(|_|"[]".into()),json!([]));
     let changed=sqlx::query("UPDATE ser_mart_orders SET status='Cancelled' WHERE id=? AND status='Pending'").bind(id).execute(&mut *tx).await.map_err(|_|ApiError::internal())?;
     if changed.rows_affected()==0{return Err(ApiError::bad("This order has already been updated."));}
