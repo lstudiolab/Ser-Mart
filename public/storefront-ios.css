@@ -1628,3 +1628,10 @@ body:not(.admin-body) .preorder-order-card>div:last-child{display:flex;flex-dire
 body:not(.admin-body) .preorder-order-card strong{font-size:14px;line-height:1.25}
 body:not(.admin-body) .preorder-order-card p{margin:0;color:#737780;font-size:12px}
 body:not(.admin-body) .preorder-order-card span{font-size:13px;font-weight:650}
+
+
+/* Reveal the compact glass header only after the hero has scrolled away. */
+body:not(.admin-body) .topbar{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;transition:background .22s ease,backdrop-filter .22s ease}
+body:not(.admin-body) .topbar-title,body:not(.admin-body) .topbar-actions{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
+body:not(.admin-body).has-scrolled .topbar{background:rgba(250,250,252,.76)!important;-webkit-backdrop-filter:saturate(180%) blur(24px)!important;backdrop-filter:saturate(180%) blur(24px)!important;box-shadow:0 1px 0 rgba(0,0,0,.04)!important}
+body:not(.admin-body).has-scrolled .topbar-title,body:not(.admin-body).has-scrolled .topbar-actions{opacity:1;visibility:visible;pointer-events:auto}
