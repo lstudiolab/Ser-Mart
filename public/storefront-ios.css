@@ -1605,3 +1605,8 @@ body:not(.admin-body).search-active .bottom-nav{bottom:calc(8px + env(safe-area-
  body:not(.admin-body) .nav-search-launch{flex-basis:58px;width:58px;height:58px}
  body:not(.admin-body) .social-login-button{min-height:47px}
 }
+@media(max-width:560px){
+ body:not(.admin-body) .bottom-nav .nav-item{min-height:0!important;padding:4px 3px!important;gap:4px!important;border-radius:999px!important;font-size:9px!important}
+ body:not(.admin-body) .bottom-nav .nav-item svg{width:20px!important;height:20px!important}
+ body:not(.admin-body) .bottom-nav{gap:8px!important}
+}
