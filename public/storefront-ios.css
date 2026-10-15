@@ -1635,3 +1635,18 @@ body:not(.admin-body) .topbar{background:transparent!important;-webkit-backdrop-
 body:not(.admin-body) .topbar-title,body:not(.admin-body) .topbar-actions{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility .2s ease}
 body:not(.admin-body).has-scrolled .topbar{background:rgba(250,250,252,.76)!important;-webkit-backdrop-filter:saturate(180%) blur(24px)!important;backdrop-filter:saturate(180%) blur(24px)!important;box-shadow:0 1px 0 rgba(0,0,0,.04)!important}
 body:not(.admin-body).has-scrolled .topbar-title,body:not(.admin-body).has-scrolled .topbar-actions{opacity:1;visibility:visible;pointer-events:auto}
+
+
+/* Bag hierarchy: product image, text, right-aligned price and purchase selector. */
+body:not(.admin-body) .cart-row.saved-cart-row{grid-template-columns:70px minmax(0,1fr) 58px!important;align-items:center;gap:9px!important}
+body:not(.admin-body) .cart-actions{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-width:0}
+body:not(.admin-body) .cart-side-price{font-size:12px;font-weight:720;line-height:1.1;white-space:nowrap;letter-spacing:-.2px}
+body:not(.admin-body) .cart-actions .cart-pick{width:30px;height:30px}
+body:not(.admin-body) .cart-actions .remove-button{width:25px;height:25px;border-radius:50%;background:rgba(255,255,255,.9);padding:5px;display:flex;align-items:center;justify-content:center}
+body:not(.admin-body) .cart-actions .remove-button svg{width:14px;height:14px}
+body:not(.admin-body) .cart-row-info .quantity-control{margin-top:3px}
+@media(max-width:560px){
+ body:not(.admin-body) .cart-row.saved-cart-row{grid-template-columns:66px minmax(0,1fr) 54px!important;gap:8px!important}
+ body:not(.admin-body) .cart-side-price{font-size:11px}
+ body:not(.admin-body) .cart-actions{gap:8px}
+}
