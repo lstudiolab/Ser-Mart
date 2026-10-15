@@ -161,7 +161,7 @@ function syncNavigation(){
  nav.hidden=false;
  if(state.tab==='search'){
   const bt=state.previousTab||'home';
-  const ic=bt==='cart'?'bag':bt==='all'?'grid':bt==='account'?'person':bt==='category'?'back':'grid';
+  const pageIcons={home:'grid',category:'back',cart:'bag',all:'package',account:'person',orders:'package',reservations:'calendar',preorders:'bag',payment:'card',shipping:'truck',feedback:'feedback',settings:'settings'};const ic=pageIcons[bt]||'grid';
   nav.className='bottom-nav search-mode';
   nav.innerHTML='<button type="button" class="search-back-button" data-search-back aria-label="Back to previous page">'+svg(ic)+'</button><label class="nav-search-field" aria-label="Search products"><span>'+svg('search')+'</span><input id="search-input" type="search" placeholder="Search Ser Mart" value="'+esc(state.search)+'" autocomplete="off" enterkeyhint="search"><button type="button" id="clear-search" aria-label="Clear search">'+svg('close')+'</button></label>';
  }else{
