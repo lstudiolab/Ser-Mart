@@ -51,6 +51,8 @@ struct StatusInput { status: String, #[serde(default)] eta: String }
 struct MessageInput { text: String }
 #[derive(Deserialize)]
 struct SearchQuery { #[serde(default)] q: String }
+#[derive(Deserialize)]
+struct SearchTermInput { term: String }
 
 fn now() -> String { chrono::Utc::now().to_rfc3339() }
 fn epoch() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
@@ -84,6 +86,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
             id {id}, image_data TEXT NOT NULL, content_type TEXT NOT NULL, created_at TEXT NOT NULL
         )"),
         format!("CREATE TABLE IF NOT EXISTS ser_mart_categories (id {id}, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '', image_url TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)"),
+        "CREATE TABLE IF NOT EXISTS ser_mart_search_terms (term TEXT PRIMARY KEY, search_count BIGINT NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)".to_string(),
         "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
@@ -189,6 +192,23 @@ async fn html_admin() -> Response {
 }
 async fn health(State(s): State<AppState>) -> Result<Json<Value>, ApiError> { sqlx::query("SELECT 1").execute(&s.pool).await.map_err(|_| ApiError::internal())?; Ok(Json(json!({"ok":true,"name":"Ser mart","database":"connected"}))) }
 
+async fn search_trends(State(s): State<AppState>) -> Result<Json<Value>,ApiError> {
+    let rows = sqlx::query("SELECT term, search_count FROM ser_mart_search_terms ORDER BY search_count DESC, updated_at DESC LIMIT 8")
+        .fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!(rows.iter().map(|r| json!({
+        "term": r.try_get::<String,_>("term").unwrap_or_default(),
+        "count": r.try_get::<i64,_>("search_count").unwrap_or_default()
+    })).collect::<Vec<_>>())))
+}
+async fn record_search(State(s): State<AppState>, Json(input): Json<SearchTermInput>) -> Result<Json<Value>,ApiError> {
+    let term = input.term.trim().to_lowercase();
+    if term.is_empty() || term.chars().count() > 60 {
+        return Err(ApiError::bad("Search terms must be between 1 and 60 characters."));
+    }
+    sqlx::query("INSERT INTO ser_mart_search_terms (term, search_count, updated_at) VALUES (?, 1, ?) ON CONFLICT(term) DO UPDATE SET search_count = ser_mart_search_terms.search_count + 1, updated_at = excluded.updated_at")
+        .bind(term).bind(now()).execute(&s.pool).await.map_err(|_|ApiError::internal())?;
+    Ok(Json(json!({"ok": true})))
+}
 async fn list_products(State(s): State<AppState>, Query(q): Query<SearchQuery>) -> Result<Json<Value>,ApiError> {
     let rows = sqlx::query("SELECT * FROM ser_mart_products WHERE is_active = 1 ORDER BY id DESC")
         .fetch_all(&s.pool).await.map_err(|_|ApiError::internal())?;
@@ -473,6 +493,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let app=Router::new()
         .route("/",get(html_index)).route("/admin",get(html_admin)).route("/admin/",get(html_admin)).route("/seller",get(html_admin)).route("/seller/",get(html_admin))
         .route("/api/health",get(health)).route("/api/products",get(list_products)).route("/api/products/{id}",get(get_product))
+        .route("/api/search-trends",get(search_trends).post(record_search))
         .route("/api/images/{id}",get(get_image)).route("/api/admin/login",post(login))
         .route("/api/admin/products",get(admin_products).post(admin_create_product))
         .route("/api/admin/products/{id}",put(admin_update_product).delete(admin_delete_product))
