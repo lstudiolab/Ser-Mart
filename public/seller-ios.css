@@ -202,3 +202,19 @@ html, body { -webkit-text-size-adjust: 100%; }
   caret-color: #1d1d1f !important;
   font-size: 16px !important;
 }
+
+/* Seller space: mobile-first controls, tables, and order cards. */
+@media (max-width: 760px) {
+  body.admin-body .app-shell { min-height: 100dvh !important; padding-bottom: 20px !important; }
+  body.admin-body .topbar { padding: 12px 14px !important; gap: 8px !important; }
+  body.admin-body .topbar-actions { gap: 8px !important; flex-wrap: wrap !important; justify-content: flex-end !important; }
+  body.admin-body .main-view, body.admin-body main, body.admin-body .admin-main { width: calc(100% - 24px) !important; max-width: none !important; margin-inline: auto !important; padding: 8px 0 24px !important; }
+  body.admin-body .admin-layout, body.admin-body .admin-grid, body.admin-body .dashboard-grid, body.admin-body .admin-columns { display: grid !important; grid-template-columns: minmax(0,1fr) !important; gap: 12px !important; }
+  body.admin-body .admin-card, body.admin-body .admin-panel, body.admin-body .admin-section, body.admin-body .admin-form, body.admin-body .admin-table-wrap { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
+  body.admin-body input:not([type=checkbox]):not([type=radio]), body.admin-body textarea, body.admin-body select { width: 100% !important; min-width: 0 !important; max-width: 100% !important; min-height: 46px !important; font-size: 16px !important; }
+  body.admin-body textarea { min-height: 96px !important; }
+  body.admin-body button, body.admin-body .primary-button, body.admin-body .secondary-button { max-width: 100% !important; overflow-wrap: anywhere !important; }
+  body.admin-body table { min-width: 620px !important; }
+  body.admin-body .admin-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+  body.admin-body h1 { font-size: clamp(28px, 8vw, 40px) !important; letter-spacing: -1.2px !important; }
+}
