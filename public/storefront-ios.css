@@ -778,3 +778,11 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, s
   body:not(.admin-body) .main-view { width: 100% !important; max-width: 100% !important; }
   body:not(.admin-body) .main-view { padding-left: 16px !important; padding-right: 16px !important; }
 }
+
+
+/* Product-card photos fill the image area; copy remains in its separate panel. */
+body:not(.admin-body) .product-photo { overflow: hidden !important; padding: 0 !important; }
+body:not(.admin-body) .product-photo img { display: block !important; width: 100% !important; height: 100% !important; min-height: 100% !important; max-height: none !important; padding: 0 !important; object-fit: cover !important; object-position: center !important; }
+body:not(.admin-body) .new-arrival-photo { padding: 0 !important; overflow: hidden !important; }
+body:not(.admin-body) .new-arrival-photo img { width: 100% !important; height: 100% !important; max-height: none !important; padding: 0 !important; object-fit: cover !important; object-position: center !important; }
+body:not(.admin-body) .detail-photo img { padding: 0 !important; object-fit: cover !important; object-position: center !important; }
