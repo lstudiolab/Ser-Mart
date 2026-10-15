@@ -2,7 +2,7 @@
 'use strict';
 const view=document.getElementById('view'),overlay=document.getElementById('overlay-root'),nav=document.getElementById('bottom-nav');
 let toastTimer;
-const state={tab:'home',products:[],categories:[],search:'',categoryFilter:'',categoryProfile:'',detail:false,selectedProduct:null,selectionDraft:{},selectionAction:'cart',selectionQty:1,checkout:false,busy:false,cart:read('ser-mart-cart',[]),refs:readSession('ser-mart-order-refs',[]),orders:[],profile:read('ser-mart-profile',{}),paymentMethod:'COD'};
+const state={tab:'home',previousTab:'home',previousCategoryProfile:'',products:[],categories:[],search:'',categoryFilter:'',categoryProfile:'',detail:false,selectedProduct:null,selectionDraft:{},selectionAction:'cart',selectionQty:1,checkout:false,busy:false,cart:read('ser-mart-cart',[]).map(x=>Object.assign({selectedForOrder:false},x)),refs:readSession('ser-mart-order-refs',[]),orders:[],profile:read('ser-mart-profile',{}),account:read('ser-mart-account',null),recentlyViewed:read('ser-mart-recently-viewed',[]),searchFrequency:read('ser-mart-search-frequency',{}),paymentMethod:'COD'};
 function read(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(_){return d;}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(_){}}
 function readSession(k,d){try{const v=JSON.parse(sessionStorage.getItem(k));return v==null?d:v;}catch(_){return d;}}
@@ -47,7 +47,9 @@ function svg(n){const p={arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',close:'<path 
 function notice(m){const b=$('#toast');b.textContent=m;b.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>b.classList.remove('visible'),2800);}
 async function api(url,opts){const o=opts||{};o.headers=Object.assign({'Content-Type':'application/json'},o.headers||{});if(!o.method||o.method.toUpperCase()==='GET')o.cache='no-store';const r=await fetch(url,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Something went wrong. Please try again.');return d;}
 function cartCount(){return state.cart.reduce((a,x)=>a+Number(x.quantity||0),0);}
+function selectedCartLines(){return state.cart.filter(x=>x.selectedForOrder===true);}
 function cartTotal(){return state.cart.reduce((a,x)=>a+Number(x.price||0)*Number(x.quantity||0),0);}
+function selectedCartTotal(){return selectedCartLines().reduce((a,x)=>a+Number(x.price||0)*Number(x.quantity||0),0);}
 function persistCart(){save('ser-mart-cart',state.cart);$('#cart-count').textContent=String(cartCount());}
 function photo(p){const src=p&&(p.imageUrl||(p.gallery&&p.gallery[0]));return src?'<img src="'+esc(imageSource(src))+'" alt="'+esc(p.name)+'" loading="lazy">':'<div class="photo-placeholder">'+svg('search')+'<span>Photo coming soon</span></div>';}
 function grid(items){if(!items.length)return '<div class="empty-state"><div class="empty-symbol">'+svg('search')+'</div><h2>No items yet</h2><p>New finds will appear here as soon as they are added to the store.</p></div>';return '<div class="product-grid">'+items.map(p=>{const soldOut=Number(p.stock)<=0;return '<button type="button" class="product-card '+(soldOut?'sold-out':'')+'" data-product="'+esc(p.id)+'"><span class="product-photo">'+photo(p)+(soldOut?'<span class="sold-out-label">Sold out</span>':'')+'</span><span class="product-info"><span class="product-title">'+esc(p.name)+'</span><span class="product-price">'+money(p.price)+'</span><span class="product-hint">'+(soldOut?'Currently unavailable':'View item '+svg('arrow'))+'</span></span></button>';}).join('')+'</div>';}
