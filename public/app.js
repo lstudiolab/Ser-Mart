@@ -43,7 +43,25 @@ function imageSource(value){
 }
 
 function money(v){return '₱'+Number(v||0).toLocaleString('en-PH',{maximumFractionDigits:2});}
-function svg(n){const p={arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/>',plus:'<path d="M12 5v14M5 12h14"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/>',check:'<path d="m5 12 4 4L19 6"/>',edit:'<path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5z"/><path d="m13.8 6.7 3.5 3.5"/>'};return '<svg class="inline-icon" viewBox="0 0 24 24" aria-hidden="true">'+(p[n]||p.arrow)+'</svg>';}
+function svg(n){const p={
+arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+back:'<path d="M19 12H5M11 6l-6 6 6 6"/>',
+close:'<path d="m6 6 12 12M18 6 6 18"/>',
+trash:'<path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/>',
+check:'<path d="m5 12 4 4L19 6"/>',
+edit:'<path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5z"/><path d="m13.8 6.7 3.5 3.5"/>',
+person:'<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.7-4 3.2-6 7.5-6s6.8 2 7.5 6"/>',
+bag:'<path d="M5 8h14l1 12H4L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+package:'<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
+calendar:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+truck:'<path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/>',
+settings:'<circle cx="12" cy="12" r="3"/><path d="M19 13l2-1-2-3-2 1-2-1-1-3h-3L10 9 8 10 6 9l-2 3 2 1v2l-2 1 2 3 2-1 2 1 1 3h3l1-3 2-1 2 1 2-3-2-1Z"/>',
+feedback:'<path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/>',
+grid:'<rect x="4" y="4" width="6" height="6" rx="1.2"/><rect x="14" y="4" width="6" height="6" rx="1.2"/><rect x="4" y="14" width="6" height="6" rx="1.2"/><rect x="14" y="14" width="6" height="6" rx="1.2"/>'
+};return '<svg class="inline-icon" viewBox="0 0 24 24" aria-hidden="true">'+(p[n]||p.arrow)+'</svg>';}
 function notice(m){const b=$('#toast');b.textContent=m;b.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>b.classList.remove('visible'),2800);}
 async function api(url,opts){const o=opts||{};o.headers=Object.assign({'Content-Type':'application/json'},o.headers||{});if(!o.method||o.method.toUpperCase()==='GET')o.cache='no-store';const r=await fetch(url,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Something went wrong. Please try again.');return d;}
 function cartCount(){return state.cart.reduce((a,x)=>a+Number(x.quantity||0),0);}
