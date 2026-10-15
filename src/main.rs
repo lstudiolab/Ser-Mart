@@ -27,7 +27,7 @@ impl IntoResponse for ApiError {
 struct Login { password: String }
 #[derive(Deserialize)]
 struct ProductInput {
-    name: String, #[serde(default)] description: String, price: f64, #[serde(default)] stock: i64,
+    name: String, #[serde(default)] description: String, price: f64, #[serde(rename="oldPrice", default)] old_price: f64, #[serde(default)] stock: i64,
     #[serde(default)] category: String, #[serde(rename="releaseDate", default)] release_date: String,
     #[serde(rename="imageUrl", default)] image_url: String, #[serde(default)] gallery: Value,
     #[serde(default)] selections: Value, #[serde(rename="isActive", default="active_default")] is_active: bool,
@@ -67,7 +67,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
     let id = if pg { "BIGSERIAL PRIMARY KEY" } else { "INTEGER PRIMARY KEY AUTOINCREMENT" };
     let sql = vec![
         format!("CREATE TABLE IF NOT EXISTS ser_mart_products (
-            id {id}, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', price DOUBLE PRECISION NOT NULL DEFAULT 0,
+            id {id}, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', price DOUBLE PRECISION NOT NULL DEFAULT 0, old_price DOUBLE PRECISION NOT NULL DEFAULT 0,
             stock BIGINT NOT NULL DEFAULT 0, image_url TEXT NOT NULL DEFAULT '', gallery TEXT NOT NULL DEFAULT '[]',
             selections TEXT NOT NULL DEFAULT '[]', category TEXT NOT NULL DEFAULT 'Other', release_date TEXT NOT NULL DEFAULT '', is_active BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL
         )"),
@@ -91,6 +91,7 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
     for statement in sql { sqlx::query(&statement).execute(pool).await?; }
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN release_date TEXT NOT NULL DEFAULT ''").execute(pool).await;
+    let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN old_price DOUBLE PRECISION NOT NULL DEFAULT 0").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_categories ADD COLUMN description TEXT NOT NULL DEFAULT ''").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_categories ADD COLUMN image_url TEXT NOT NULL DEFAULT ''").execute(pool).await;
     // Preserve existing product categories when seller-managed categories are introduced.
@@ -114,7 +115,7 @@ fn product_json(r: &sqlx::any::AnyRow) -> Value {
         "id": r.try_get::<i64,_>("id").unwrap_or_default(),
         "name": r.try_get::<String,_>("name").unwrap_or_default(),
         "description": r.try_get::<String,_>("description").unwrap_or_default(),
-        "price": r.try_get::<f64,_>("price").unwrap_or_default(), "stock": stock,
+        "price": r.try_get::<f64,_>("price").unwrap_or_default(), "oldPrice": r.try_get::<f64,_>("old_price").unwrap_or_default(), "stock": stock,
         "imageUrl": r.try_get::<String,_>("image_url").unwrap_or_default(),
         "gallery": parse_json(gallery, json!([])), "selections": parse_json(selections, json!([])),
         "category": r.try_get::<String,_>("category").unwrap_or_else(|_| "Other".into()),
@@ -229,18 +230,19 @@ async fn save_product(pool:&AnyPool,input:ProductInput,id:Option<i64>)->Result<V
     let name=input.name.trim().to_string();
     if name.is_empty(){return Err(ApiError::bad("Please enter an item name."));}
     if !input.price.is_finite()||input.price<0.0{return Err(ApiError::bad("Enter a valid price."));}
+    if !input.old_price.is_finite()||input.old_price<0.0{return Err(ApiError::bad("Enter a valid old price."));}
     if input.stock<0{return Err(ApiError::bad("Stock cannot be below zero."));}
     let gallery=serde_json::to_string(&if input.gallery.is_array(){input.gallery}else{json!([])}).map_err(|_|ApiError::internal())?;
     let selections=serde_json::to_string(&if input.selections.is_array(){input.selections}else{json!([])}).map_err(|_|ApiError::internal())?;
     let active=1_i64; // Stock changes never hide an item; only the explicit delete action removes it.
     let product_id=if let Some(id)=id{
-        let r=sqlx::query("UPDATE ser_mart_products SET name=?,description=?,price=?,stock=?,image_url=?,gallery=?,selections=?,category=?,release_date=?,is_active=? WHERE id=?")
-            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(input.category).bind(input.release_date).bind(active).bind(id)
+        let r=sqlx::query("UPDATE ser_mart_products SET name=?,description=?,price=?,old_price=?,stock=?,image_url=?,gallery=?,selections=?,category=?,release_date=?,is_active=? WHERE id=?")
+            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.old_price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(input.category).bind(input.release_date).bind(active).bind(id)
             .execute(pool).await.map_err(|_|ApiError::internal())?;
         if r.rows_affected()==0{return Err(ApiError::missing("Item not found."));} id
     }else{
-        let r=sqlx::query("INSERT INTO ser_mart_products (name,description,price,stock,image_url,gallery,selections,category,release_date,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING id")
-            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(input.category).bind(input.release_date).bind(active).bind(now())
+        let r=sqlx::query("INSERT INTO ser_mart_products (name,description,price,old_price,stock,image_url,gallery,selections,category,release_date,is_active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id")
+            .bind(name).bind(input.description.trim().to_string()).bind(input.price).bind(input.old_price).bind(input.stock).bind(input.image_url).bind(gallery).bind(selections).bind(input.category).bind(input.release_date).bind(active).bind(now())
             .fetch_one(pool).await.map_err(|_|ApiError::internal())?;
         r.try_get("id").map_err(|_|ApiError::internal())?
     };
