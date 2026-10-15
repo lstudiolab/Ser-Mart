@@ -786,3 +786,166 @@ body:not(.admin-body) .product-photo img { display: block !important; width: 100
 body:not(.admin-body) .new-arrival-photo { padding: 0 !important; overflow: hidden !important; }
 body:not(.admin-body) .new-arrival-photo img { width: 100% !important; height: 100% !important; max-height: none !important; padding: 0 !important; object-fit: cover !important; object-position: center !important; }
 body:not(.admin-body) .detail-photo img { padding: 0 !important; object-fit: cover !important; object-position: center !important; }
+
+
+/* Ser mart — liquid-glass depth system. Keep motion lightweight on phones. */
+body:not(.admin-body) {
+  background:
+    radial-gradient(ellipse at 8% 4%, rgba(226,232,240,.72), transparent 34rem),
+    radial-gradient(ellipse at 92% 28%, rgba(245,245,247,.9), transparent 30rem),
+    #fbfbfd !important;
+  background-attachment: fixed !important;
+}
+body:not(.admin-body) .topbar {
+  background: rgba(255,255,255,.66) !important;
+  border-bottom-color: rgba(255,255,255,.82) !important;
+  box-shadow: 0 8px 28px rgba(20,20,25,.035) !important;
+}
+body:not(.admin-body) .bottom-nav {
+  background: rgba(255,255,255,.54) !important;
+  border: 1px solid rgba(255,255,255,.82) !important;
+  box-shadow: 0 14px 44px rgba(20,20,30,.13), inset 0 1px 0 rgba(255,255,255,.95) !important;
+}
+body:not(.admin-body) .product-card,
+body:not(.admin-body) .category-card,
+body:not(.admin-body) .order-card,
+body:not(.admin-body) .form-panel,
+body:not(.admin-body) .checkout-summary,
+body:not(.admin-body) .cart-summary,
+body:not(.admin-body) .new-arrival-card,
+body:not(.admin-body) .welcome-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.94) !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(246,246,249,.72)) !important;
+  box-shadow: 0 12px 30px rgba(23,23,30,.055), inset 0 1px 0 rgba(255,255,255,.98) !important;
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(var(--lift, 0px));
+  transform-style: preserve-3d;
+  transition: transform .32s cubic-bezier(.2,.75,.25,1), box-shadow .32s ease, border-color .32s ease;
+}
+body:not(.admin-body) .product-card::before,
+body:not(.admin-body) .category-card::before,
+body:not(.admin-body) .new-arrival-card::before,
+body:not(.admin-body) .welcome-panel::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at var(--shine-x, 18%) var(--shine-y, 0%), rgba(255,255,255,.78), transparent 42%),
+    linear-gradient(120deg, transparent 28%, rgba(255,255,255,.24) 45%, transparent 62%);
+  opacity: .55;
+  mix-blend-mode: screen;
+  transition: opacity .3s ease;
+}
+body:not(.admin-body) .product-card::after,
+body:not(.admin-body) .category-card::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  border: 1px solid rgba(255,255,255,.38);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 rgba(0,0,0,.025);
+}
+body:not(.admin-body) .product-card:active,
+body:not(.admin-body) .category-card:active,
+body:not(.admin-body) .nav-item:active,
+body:not(.admin-body) .primary-button:active,
+body:not(.admin-body) .detail-buy-now:active {
+  --lift: 1px;
+  transition-duration: .12s;
+}
+body:not(.admin-body) .product-card .product-photo,
+body:not(.admin-body) .new-arrival-photo {
+  position: relative;
+  background: linear-gradient(145deg,#f8f8fa,#e9e9ee) !important;
+  overflow: hidden !important;
+}
+body:not(.admin-body) .product-card .product-photo img,
+body:not(.admin-body) .new-arrival-photo img,
+body:not(.admin-body) .category-tile-image {
+  transition: transform .7s cubic-bezier(.2,.7,.2,1), filter .5s ease !important;
+  will-change: transform;
+}
+body:not(.admin-body) .product-card:hover .product-photo img,
+body:not(.admin-body) .new-arrival-card:hover .new-arrival-photo img {
+  transform: scale(1.055) !important;
+  filter: saturate(1.05) contrast(1.015);
+}
+body:not(.admin-body) .product-info {
+  position: relative;
+  z-index: 3;
+  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.96)) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+body:not(.admin-body) .category-card,
+body:not(.admin-body) .nav-item,
+body:not(.admin-body) .icon-button,
+body:not(.admin-body) .seller-entry,
+body:not(.admin-body) .primary-button,
+body:not(.admin-body) .secondary-button,
+body:not(.admin-body) .detail-buy-now,
+body:not(.admin-body) #checkout-submit,
+body:not(.admin-body) #confirm-selection {
+  transition: transform .24s cubic-bezier(.2,.75,.25,1), box-shadow .24s ease, background .24s ease !important;
+}
+body:not(.admin-body) .primary-button,
+body:not(.admin-body) .detail-buy-now,
+body:not(.admin-body) #checkout-submit,
+body:not(.admin-body) #confirm-selection {
+  background: linear-gradient(135deg,#222226,#050505) !important;
+  box-shadow: 0 7px 18px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.18) !important;
+}
+body:not(.admin-body) .icon-button,
+body:not(.admin-body) .seller-entry {
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.52);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  backdrop-filter: blur(16px) saturate(1.35);
+}
+@media (hover:hover) and (pointer:fine) {
+  body:not(.admin-body) .product-card:hover,
+  body:not(.admin-body) .category-card:hover {
+    --lift: -4px;
+    box-shadow: 0 22px 48px rgba(20,20,30,.12), inset 0 1px 0 white !important;
+    border-color: rgba(255,255,255,1) !important;
+  }
+  body:not(.admin-body) .primary-button:hover,
+  body:not(.admin-body) .detail-buy-now:hover,
+  body:not(.admin-body) #checkout-submit:hover {
+    transform: translateY(-2px) scale(1.015);
+    box-shadow: 0 12px 25px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.2) !important;
+  }
+}
+@keyframes ser-liquid-glint {
+  0%,100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+body:not(.admin-body) .welcome-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,.84), rgba(238,239,244,.75), rgba(255,255,255,.92)) !important;
+  background-size: 220% 220% !important;
+  animation: ser-liquid-glint 12s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.admin-body) *,
+  body:not(.admin-body) *::before,
+  body:not(.admin-body) *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 760px) {
+  body:not(.admin-body) .product-card,
+  body:not(.admin-body) .category-card {
+    transform: none !important;
+  }
+  body:not(.admin-body) .product-card .product-photo { min-height: 0; }
+}
