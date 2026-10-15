@@ -122,9 +122,70 @@ const sections=groups.map(name=>{const items=state.products.filter(product=>prod
 const unassigned=state.products.filter(product=>!groups.includes(productCategory(product)));
 view.innerHTML='<section class="page-heading"><span class="eyebrow">The full collection</span><h1>All items</h1><p>Browse the sections created by the seller.</p></section>'+sections+(unassigned.length?'<section class="all-items-group unassigned-items"><div class="section-heading"><h2>Needs a section</h2><span class="muted small">'+unassigned.length+' items</span></div>'+grid(unassigned)+'</section>':'')+(!sections&&!unassigned.length?'<div class="category-empty-state">The seller has not added any items yet.</div>':'');
 }
-function render(){removeBars();nav.hidden=state.checkout||state.detail||state.tab==='orders';$('#topbar').hidden=state.checkout||state.detail;document.body.classList.toggle('checkout-active',state.checkout);if(!state.checkout)document.body.classList.remove('checkout-field-focused');document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));$('#cart-count').textContent=String(cartCount());if(state.detail)return;
-if(state.checkout){renderCheckout();const bar=document.createElement('div');bar.className='checkout-order-bar';bar.innerHTML='<div><span class="muted small">Receipt total</span><strong>'+money(cartTotal())+'</strong></div><button class="primary-button" id="checkout-submit" type="submit" form="checkout-form">Place order '+svg('arrow')+'</button>';document.body.appendChild(bar);}
-else if(state.tab==='home')renderHome();else if(state.tab==='category')renderCategoryProfile();else if(state.tab==='all')renderAll();else if(state.tab==='search')renderSearch();else if(state.tab==='orders')renderOrders();else if(state.tab==='cart'){renderCart();if(state.cart.length){const bar=document.createElement('div');bar.className='cart-order-bar';bar.innerHTML='<div><span class="muted small">Total</span><strong>'+money(cartTotal())+'</strong></div><button class="primary-button" type="button" id="order-all">Order all '+svg('arrow')+'</button>';document.body.appendChild(bar);}}else renderHome();}
+function render(){
+ removeBars();nav.hidden=state.checkout||state.detail;
+ $('#topbar').hidden=state.checkout||state.detail;
+ document.body.classList.toggle('checkout-active',state.checkout);
+ document.body.classList.toggle('search-active',state.tab==='search'&&!state.checkout&&!state.detail);
+ document.body.classList.toggle('has-scrolled',window.scrollY>100);
+ if(!state.checkout)document.body.classList.remove('checkout-field-focused');
+ syncNavigation();
+ document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));
+ $('#cart-count').textContent=String(cartCount());
+ if(state.detail)return;
+ if(state.checkout){
+  renderCheckout();
+  const bar=document.createElement('div');bar.className='checkout-order-bar';
+  bar.innerHTML='<div><span class="muted small">Order total</span><strong>'+money(selectedCartTotal())+'</strong></div><button class="primary-button" id="checkout-submit" type="submit" form="checkout-form">Place order '+svg('arrow')+'</button>';
+  document.body.appendChild(bar);
+ }else if(state.tab==='home')renderHome();
+ else if(state.tab==='category')renderCategoryProfile();
+ else if(state.tab==='all')renderAll();
+ else if(state.tab==='search')renderSearch();
+ else if(state.tab==='orders')renderOrders();
+ else if(state.tab==='cart'){
+  renderCart();
+  if(selectedCartLines().length){
+   const bar=document.createElement('div');bar.className='cart-order-bar';
+   bar.innerHTML='<div><span class="muted small">'+selectedCartLines().length+' selected</span><strong>'+money(selectedCartTotal())+'</strong></div><button class="primary-button" type="button" id="order-all">Buy now '+svg('arrow')+'</button>';
+   document.body.appendChild(bar);
+  }
+ }else if(state.tab==='account')renderAccount();
+ else if(['reservations','preorders','payment','shipping','feedback','settings'].includes(state.tab))renderAccountSection(state.tab);
+ else renderHome();
+}
+function syncNavigation(){
+ if(state.checkout||state.detail){nav.hidden=true;return;}
+ nav.hidden=false;
+ if(state.tab==='search'){
+  const bt=state.previousTab||'home';
+  const ic=bt==='cart'?'bag':bt==='all'?'grid':bt==='account'?'person':bt==='category'?'back':'grid';
+  nav.className='bottom-nav search-mode';
+  nav.innerHTML='<button type="button" class="search-back-button" data-search-back aria-label="Back to previous page">'+svg(ic)+'</button><label class="nav-search-field" aria-label="Search products"><span>'+svg('search')+'</span><input id="search-input" type="search" placeholder="Search Ser Mart" value="'+esc(state.search)+'" autocomplete="off" enterkeyhint="search"><button type="button" id="clear-search" aria-label="Clear search">'+svg('close')+'</button></label>';
+ }else{
+  nav.className='bottom-nav';
+  nav.innerHTML='<div class="nav-pill"><button class="nav-item '+(state.tab==='home'||state.tab==='category'?'active':'')+'" type="button" data-tab="home">'+svg('grid')+'<span>Products</span></button><button class="nav-item '+(state.tab==='cart'?'active':'')+'" type="button" data-tab="cart">'+svg('bag')+'<span>Bag</span><span class="nav-count">'+cartCount()+'</span></button><button class="nav-item '+(state.tab==='all'?'active':'')+'" type="button" data-tab="all">'+svg('package')+'<span>All items</span></button></div><button class="nav-search-launch" type="button" data-tab="search" aria-label="Search">'+svg('search')+'<span>Search</span></button>';
+ }
+}
+function renderAccount(){
+ const a=state.account||null;
+ const accountCard=a
+ ?'<section class="account-profile-card"><span class="account-avatar">'+esc(String(a.name||a.email||'S').trim().charAt(0).toUpperCase())+'</span><span class="account-profile-meta"><strong>'+esc(a.name||'Ser Mart customer')+'</strong><small>'+esc(a.email||'')+'</small></span><button type="button" class="icon-button" data-account-action="edit" aria-label="Edit profile">'+svg('edit')+'</button></section>'
+ :'<section class="account-login-card"><div class="account-login-copy"><h2>Sign in to Ser Mart</h2><p>Keep your orders, reservations, pre-orders, and preferences together.</p></div><button type="button" class="social-login-button" data-oauth="google"><span class="google-mark">G</span>Continue with Google</button><button type="button" class="social-login-button apple-login" data-oauth="apple"><span class="apple-mark">●</span>Continue with Apple</button><p class="auth-setup-note">Google and Apple sign-in need provider setup before they can be enabled.</p></section>';
+ const menu=items=>'<div class="account-menu-group">'+items.map(it=>'<button type="button" class="account-menu-row" data-account-page="'+it[0]+'"><span class="account-menu-icon">'+svg(it[2])+'</span><span>'+it[1]+'</span>'+svg('arrow')+'</button>').join('')+'</div>';
+ view.innerHTML='<section class="account-page"><div class="account-heading"><span class="eyebrow">SER MART</span><h1>Account</h1></div>'+accountCard+menu([['reservations','Reservations','calendar'],['orders','Orders','package'],['preorders','Pre-Orders','bag']])+menu([['payment','Primary Payment','card'],['shipping','Primary Shipping','truck'],['feedback','Give Feedbacks','feedback'],['settings','Settings','settings']])+'</section>';
+}
+function renderAccountSection(page){
+ const labels={reservations:'Reservations',preorders:'Pre-Orders',payment:'Primary Payment',shipping:'Primary Shipping',feedback:'Give Feedbacks',settings:'Settings'};
+ let inner='';
+ if(page==='reservations')inner='<div class="account-empty-state">'+svg('calendar')+'<h2>No reservations yet.</h2><p>Your reservations will be listed here.</p></div>';
+ else if(page==='preorders')inner='<div class="account-empty-state">'+svg('bag')+'<h2>No pre-orders yet.</h2><p>Items you pre-order will be shown here.</p></div>';
+ else if(page==='payment')inner='<div class="account-preference-card">'+svg('card')+'<div><strong>Primary payment method</strong><p>Choose GCash, cash on delivery, or cash on pickup at checkout.</p></div></div>';
+ else if(page==='shipping')inner='<div class="account-preference-card">'+svg('truck')+'<div><strong>Primary shipping details</strong><p>'+(state.profile&&state.profile.address?esc(state.profile.address):'Your saved address will appear here after checkout.')+'</p><small>'+(state.profile&&state.profile.exactPlace?esc(state.profile.exactPlace):'')+'</small></div></div>';
+ else if(page==='feedback')inner='<div class="account-preference-card">'+svg('feedback')+'<div><strong>Help improve Ser Mart</strong><p>Your feedback is saved on this device.</p></div></div><form class="feedback-form" id="feedback-form"><label for="feedback-message">Your feedback</label><textarea id="feedback-message" name="message" rows="4" placeholder="Tell us what you think" required></textarea><button type="submit" class="primary-button">Save feedback '+svg('arrow')+'</button></form>';
+ else inner='<div class="account-preference-card">'+svg('settings')+'<div><strong>Preferences</strong><p>Light appearance with a blue accent.</p></div></div>';
+ view.innerHTML='<section class="account-section-page"><button type="button" class="text-button account-back" data-tab="account">'+svg('back')+' Account</button><span class="eyebrow">ACCOUNT</span><h1>'+esc(labels[page]||'Account')+'</h1>'+inner+'</section>';
+}
 async function loadProducts(){try{state.products=await api('/api/products');}catch(_){state.products=[];notice('The store could not refresh. Open it again in a moment.');}}
 async function loadCategories(){try{state.categories=await api('/api/categories');}catch(_){state.categories=[];}}
 function renderDetail(p){
