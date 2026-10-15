@@ -764,16 +764,9 @@ body.checkout-active .form-panel textarea::placeholder { color: #8a8a90 !importa
   .welcome-panel { border-radius: 30px !important; }
 }
 
-/* Settings and Ser mart customer sign-in. */
-.settings-card{margin:16px 0;padding:24px;border:1px solid #ffffffed;border-radius:30px;background:#ffffffbf;box-shadow:0 8px 26px #19192308}
-.settings-card h2{margin:8px 0;font-size:22px;letter-spacing:-.5px}
-.settings-card p{color:#77777f;font-size:13px;line-height:1.6}
-#customer-auth-form{margin-top:18px}
-#customer-auth-form input{font-size:16px!important;min-height:50px;border-radius:16px!important;background:#fff!important;appearance:none;-webkit-appearance:none;touch-action:auto;user-select:text;-webkit-user-select:text}
-#customer-auth-form input:focus,#checkout-form input:focus,#checkout-form textarea:focus{outline:none!important;border-color:#777!important;box-shadow:0 0 0 2px #11111112!important}
-#customer-auth-form .primary-button{width:100%;min-height:50px;border-radius:999px}
-#toggle-customer-auth{margin:18px 2px 0}
-@media(max-width:760px){#customer-auth-form{gap:16px;padding:18px!important}#customer-auth-form input,#checkout-form input,#checkout-form textarea{font-size:16px!important;line-height:1.4!important;min-height:50px!important}#customer-auth-form label,#checkout-form label{scroll-margin-top:18px;scroll-margin-bottom:calc(var(--keyboard-height,0px) + 32px)}#view{overflow:visible;transform:none!important;filter:none!important}}
+/* Buyer sign-in was removed; keep checkout focus styling only. */
+#checkout-form input:focus,#checkout-form textarea:focus{outline:none!important;border-color:#777!important;box-shadow:0 0 0 2px #11111112!important}
+@media(max-width:760px){#checkout-form input,#checkout-form textarea{font-size:16px!important;line-height:1.4!important;min-height:50px!important}#checkout-form label{scroll-margin-top:18px;scroll-margin-bottom:32px}#view{overflow:visible;transform:none!important;filter:none!important}}
 
 
 /* Critical iOS input recovery: never place editable controls inside animated/transformed
@@ -820,7 +813,7 @@ textarea, select {
   animation: none !important;
 }
 @media (max-width: 760px) {
-  html, body { overflow-x: clip; }
+  html, body { overflow-x: hidden; }
   #view, .main-view, .app-shell { transform: none !important; }
   .bottom-nav, .checkout-order-bar { transition: none !important; }
 }
@@ -829,8 +822,8 @@ textarea, select {
 #checkout-form input:not([type=radio]), #checkout-form textarea {
   -webkit-transform: none !important;
   transform: none !important;
-  touch-action: manipulation;
-  scroll-margin-bottom: 140px;
+  touch-action: auto !important;
+  scroll-margin-bottom: 32px;
 }
 .payment-choice { -webkit-tap-highlight-color: transparent; }
 .payment-choice.is-selected { border-color: #1d1d1f !important; background: #f5f5f7 !important; }
