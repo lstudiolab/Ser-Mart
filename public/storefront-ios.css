@@ -1680,3 +1680,8 @@ body:not(.admin-body):has(.main-view > .loading-state){background:#050507!import
 body:not(.admin-body):has(.main-view > .loading-state) .main-view{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;width:100%;max-width:none;margin:0;padding:0;background:#050507!important}
 body:not(.admin-body):has(.main-view > .loading-state) .loading-state{width:100%;min-height:100dvh;gap:12px;background:#050507;color:#8b93a4}
 body:not(.admin-body):has(.main-view > .loading-state) .loading-ring{width:20px;height:20px;border-color:#1b263b;border-top-color:#087bff}
+
+
+/* The product detail price action uses a clear liquid-glass treatment. */
+body:not(.admin-body) .detail-actions .detail-buy-now{background:rgba(255,255,255,.7)!important;border:1px solid rgba(255,255,255,.96)!important;color:#111!important;-webkit-backdrop-filter:saturate(180%) blur(24px)!important;backdrop-filter:saturate(180%) blur(24px)!important;box-shadow:0 8px 26px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.95)!important}
+body:not(.admin-body) .detail-actions .detail-buy-now:active{transform:scale(.985)}
