@@ -126,8 +126,24 @@ html+='<div class="selection-quantity"><span>Quantity</span><div class="quantity
 function confirmSelection(){const p=state.selectedProduct,price=dynamicPrice(p,state.selectionDraft);const missing=(p.selections||[]).find(g=>g.required!==false&&(g.options||[]).length&&!state.selectionDraft[g.name]);if(missing){notice('Please choose '+missing.name+'.');return;}const line={productId:p.id,name:p.name,description:p.description||'',imageUrl:p.imageUrl||'',price:price,basePrice:p.price,quantity:state.selectionQty||1,selections:Object.assign({},state.selectionDraft),stock:Number(p.stock),gallery:p.gallery||[],selectedForOrder:state.selectionAction==='order'};if(line.quantity>Number(p.stock)){notice('Only '+p.stock+' of this item are in stock.');return;}const same=state.cart.find(x=>String(x.productId)===String(line.productId)&&JSON.stringify(x.selections||{})===JSON.stringify(line.selections||{}));if(same){if(Number(same.quantity)+line.quantity>Number(p.stock)){notice('Only '+p.stock+' of this item are in stock, including the quantity already in your bag.');return;}same.quantity=Number(same.quantity)+line.quantity;same.stock=Number(p.stock);if(line.selectedForOrder)same.selectedForOrder=true;}else state.cart.push(line);overlay.innerHTML='';persistCart();if(state.selectionAction==='order'){state.detail=false;state.checkout=true;state.tab='cart';render();}else{notice('Saved to your bag. Stock is not reserved until checkout.');if(state.detail)state.detail=false;render();}}
 
 /* Inputs receive native pointer/click events so iOS can focus them and open its keyboard. */
-async function submitOrder(form){if(state.busy)return;if(!form.reportValidity())return;state.busy=true;const button=$('#checkout-submit');if(button){button.disabled=true;button.textContent='Sending order…';}const f=new FormData(form);const payload={customerName:String(f.get('customerName')||'').trim(),contactNumber:String(f.get('contactNumber')||'').trim(),address:String(f.get('address')||'').trim(),exactPlace:String(f.get('exactPlace')||'').trim(),request:String(f.get('request')||'').trim(),paymentMethod:String(f.get('paymentMethod')||state.paymentMethod||'COD'),items:state.cart.map(x=>({productId:x.productId,quantity:x.quantity,selections:x.selections||{}}))};
-try{const result=await api('/api/orders',{method:'POST',body:JSON.stringify(payload)});state.profile={name:payload.customerName,phone:payload.contactNumber,address:payload.address,exactPlace:payload.exactPlace};save('ser-mart-profile',state.profile);state.refs.unshift({id:result.id,token:result.accessToken});saveSession('ser-mart-order-refs',state.refs);state.cart=[];persistCart();state.checkout=false;state.editProfile=false;state.detail=false;state.tab='orders';await loadOrders();await loadProducts();render();notice('Order #'+result.id+' sent to the seller.');}catch(err){notice(err.message);if(button){button.disabled=false;button.innerHTML='Place order '+svg('arrow');}}finally{state.busy=false;}}
+async function submitOrder(form){
+ if(state.busy)return;
+ if(!form.reportValidity())return;
+ const orderLines=selectedCartLines();
+ if(!orderLines.length){notice('Choose at least one item to buy.');state.checkout=false;render();return;}
+ state.busy=true;
+ const button=$('#checkout-submit');if(button){button.disabled=true;button.textContent='Sending order…';}
+ const f=new FormData(form);
+ const payload={customerName:String(f.get('customerName')||'').trim(),contactNumber:String(f.get('contactNumber')||'').trim(),address:String(f.get('address')||'').trim(),exactPlace:String(f.get('exactPlace')||'').trim(),request:String(f.get('request')||'').trim(),paymentMethod:String(f.get('paymentMethod')||state.paymentMethod||'COD'),items:orderLines.map(x=>({productId:x.productId,quantity:x.quantity,selections:x.selections||{}}))};
+ try{
+  const result=await api('/api/orders',{method:'POST',body:JSON.stringify(payload)});
+  state.profile={name:payload.customerName,phone:payload.contactNumber,address:payload.address,exactPlace:payload.exactPlace};save('ser-mart-profile',state.profile);
+  state.refs.unshift({id:result.id,token:result.accessToken});saveSession('ser-mart-order-refs',state.refs);
+  const ordered=new Set(orderLines);state.cart=state.cart.filter(x=>!ordered.has(x));persistCart();
+  state.checkout=false;state.editProfile=false;state.detail=false;state.tab='orders';await loadOrders();await loadProducts();render();notice('Order #'+result.id+' sent to the seller.');
+ }catch(err){notice(err.message);if(button){button.disabled=false;button.innerHTML='Place order '+svg('arrow');}}
+ finally{state.busy=false;}
+}
 document.addEventListener('click',async e=>{
 if(e.target.closest('input,textarea,select'))return;
 const category=e.target.closest('[data-category]');if(category){state.categoryProfile=category.dataset.category;state.categoryFilter='';state.search='';state.tab='category';state.detail=false;overlay.innerHTML='';render();return;}const tab=e.target.closest('[data-tab]');if(tab&&!state.checkout){if(tab.dataset.tab!=='search')state.categoryFilter='';state.categoryProfile='';state.tab=tab.dataset.tab;state.detail=false;overlay.innerHTML='';if(state.tab==='orders')await loadOrders();render();return;}
