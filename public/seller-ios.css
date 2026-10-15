@@ -218,3 +218,7 @@ html, body { -webkit-text-size-adjust: 100%; }
   body.admin-body .admin-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
   body.admin-body h1 { font-size: clamp(28px, 8vw, 40px) !important; letter-spacing: -1.2px !important; }
 }
+
+
+/* Keep native iOS editing enabled; avoid gesture overrides on seller controls. */
+body.admin-body input:not([type=checkbox]):not([type=radio]):not([type=file]), body.admin-body textarea, body.admin-body select { touch-action: auto !important; -webkit-user-select: text !important; user-select: text !important; -webkit-transform: none !important; transform: none !important; }
