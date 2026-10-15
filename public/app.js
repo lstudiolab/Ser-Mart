@@ -281,6 +281,10 @@ const form=e.target.closest('[data-message-form]');if(form){e.preventDefault();c
 });
 
 
+/* Update the compact glass header during scroll without rerendering the page. */
+let scrollHeaderFrame=0;
+window.addEventListener('scroll',()=>{if(scrollHeaderFrame)return;scrollHeaderFrame=requestAnimationFrame(()=>{document.body.classList.toggle('has-scrolled',window.scrollY>100);scrollHeaderFrame=0;});},{passive:true});
+
 /* Keep missing product photos from rendering as broken-image icons. */
 document.addEventListener('error',e=>{
   const img=e.target;
