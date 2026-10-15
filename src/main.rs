@@ -110,12 +110,12 @@ async fn init_db(pool: &AnyPool, pg: bool) -> Result<(), sqlx::Error> {
         "CREATE TABLE IF NOT EXISTS ser_mart_search_terms (term TEXT PRIMARY KEY, search_count BIGINT NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)".to_string(),
         "CREATE TABLE IF NOT EXISTS ser_mart_seller_profile (id BIGINT PRIMARY KEY, name TEXT NOT NULL DEFAULT 'Ser mart', phone TEXT NOT NULL DEFAULT '', gcash_number TEXT NOT NULL DEFAULT '', gcash_name TEXT NOT NULL DEFAULT '', pickup_address TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '')".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_token ON ser_mart_orders(access_token)".to_string(),
-        "CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_customer ON ser_mart_orders(customer_id)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_customer_sessions_customer ON ser_mart_customer_sessions(customer_id)".to_string(),
         "CREATE INDEX IF NOT EXISTS idx_ser_mart_messages_order ON ser_mart_order_messages(order_id)".to_string(),
     ];
     for statement in sql { sqlx::query(&statement).execute(pool).await?; }
     let _ = sqlx::query("ALTER TABLE ser_mart_orders ADD COLUMN customer_id BIGINT").execute(pool).await;
+    let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_ser_mart_orders_customer ON ser_mart_orders(customer_id)").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN release_date TEXT NOT NULL DEFAULT ''").execute(pool).await;
     let _ = sqlx::query("ALTER TABLE ser_mart_products ADD COLUMN old_price DOUBLE PRECISION NOT NULL DEFAULT 0").execute(pool).await;
