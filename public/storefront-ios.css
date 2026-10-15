@@ -1203,3 +1203,156 @@ body:not(.admin-body) select:focus {
   position: relative !important;
   z-index: 4 !important;
 }
+
+
+/* Light-mode-first Ser Mart refresh — buyer storefront only. */
+:root {
+  color-scheme: light;
+  --ser-canvas: #fafafc;
+  --ser-surface: #ffffff;
+  --ser-surface-soft: #f4f5f7;
+  --ser-ink: #17181a;
+  --ser-muted: #686b73;
+  --ser-line: #e4e6eb;
+  --ser-accent: #087b45;
+  --ser-accent-strong: #006c3a;
+}
+html, body:not(.admin-body) {
+  color-scheme: light !important;
+  background: var(--ser-canvas) !important;
+  color: var(--ser-ink) !important;
+}
+body:not(.admin-body) .app-shell { background: var(--ser-canvas) !important; }
+body:not(.admin-body) .main-view {
+  width: min(100%, 1280px);
+  margin-inline: auto;
+}
+body:not(.admin-body) .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 64px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  background: rgba(255,255,255,.88) !important;
+  border-bottom: 1px solid rgba(25,28,35,.07) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+  backdrop-filter: saturate(180%) blur(20px) !important;
+}
+body:not(.admin-body) .wordmark { color: var(--ser-ink) !important; }
+body:not(.admin-body) .wordmark-dot { background: var(--ser-accent) !important; }
+body:not(.admin-body) .primary-button,
+body:not(.admin-body) button.primary-button {
+  background: var(--ser-accent) !important;
+  border-color: var(--ser-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 9px rgba(0,100,55,.12);
+}
+body:not(.admin-body) .primary-button:active { background: var(--ser-accent-strong) !important; }
+body:not(.admin-body) .product-card,
+body:not(.admin-body) .category-card,
+body:not(.admin-body) .form-panel,
+body:not(.admin-body) .cart-item,
+body:not(.admin-body) .order-card,
+body:not(.admin-body) .search-panel,
+body:not(.admin-body) .empty-state,
+body:not(.admin-body) .detail-panel {
+  background: var(--ser-surface) !important;
+  color: var(--ser-ink) !important;
+  border-color: var(--ser-line) !important;
+  box-shadow: 0 5px 22px rgba(25,28,35,.045);
+}
+body:not(.admin-body) .product-card,
+body:not(.admin-body) .category-card {
+  border-radius: 20px !important;
+  overflow: hidden;
+}
+body:not(.admin-body) .product-card img,
+body:not(.admin-body) .category-card img {
+  -webkit-user-drag: none;
+}
+body:not(.admin-body) .muted,
+body:not(.admin-body) .small,
+body:not(.admin-body) .eyebrow,
+body:not(.admin-body) .result-count { color: var(--ser-muted) !important; }
+body:not(.admin-body) input:not([type="radio"]):not([type="checkbox"]),
+body:not(.admin-body) textarea,
+body:not(.admin-body) select {
+  background-color: #fff !important;
+  border-color: #d9dce2 !important;
+  border-radius: 13px !important;
+  color: var(--ser-ink) !important;
+}
+body:not(.admin-body) input::placeholder,
+body:not(.admin-body) textarea::placeholder { color: #858992 !important; opacity: 1; }
+body:not(.admin-body) input:focus,
+body:not(.admin-body) textarea:focus,
+body:not(.admin-body) select:focus {
+  border-color: #8c9690 !important;
+  box-shadow: 0 0 0 3px rgba(8,123,69,.1) !important;
+}
+body:not(.admin-body) .bottom-nav {
+  background: rgba(255,255,255,.92) !important;
+  border: 1px solid rgba(25,28,35,.08) !important;
+  box-shadow: 0 8px 30px rgba(20,25,35,.12) !important;
+  padding-bottom: max(5px, env(safe-area-inset-bottom)) !important;
+}
+body:not(.admin-body) .nav-item { color: #6a6d75 !important; }
+body:not(.admin-body) .nav-item.active {
+  color: var(--ser-accent) !important;
+  background: rgba(8,123,69,.09) !important;
+}
+body:not(.admin-body) .count-badge {
+  background: var(--ser-accent) !important;
+  color: #fff !important;
+}
+body:not(.admin-body) .sheet-backdrop {
+  background: rgba(20,22,26,.32) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+body:not(.admin-body) .selection-sheet,
+body:not(.admin-body) .modal,
+body:not(.admin-body) .dialog,
+body:not(.admin-body) .quick-cart {
+  background: #fff !important;
+  color: var(--ser-ink) !important;
+  border: 1px solid rgba(25,28,35,.08) !important;
+  border-radius: 24px !important;
+}
+body:not(.admin-body) button,
+body:not(.admin-body) a,
+body:not(.admin-body) input,
+body:not(.admin-body) textarea,
+body:not(.admin-body) select {
+  -webkit-tap-highlight-color: transparent;
+}
+body:not(.admin-body) button:focus-visible,
+body:not(.admin-body) a:focus-visible,
+body:not(.admin-body) input:focus-visible,
+body:not(.admin-body) textarea:focus-visible,
+body:not(.admin-body) select:focus-visible {
+  outline: 2px solid #087b45 !important;
+  outline-offset: 3px !important;
+}
+body:not(.admin-body) img { max-width: 100%; }
+@media (max-width: 760px) {
+  body:not(.admin-body) .topbar { padding-inline: 16px !important; }
+  body:not(.admin-body) .main-view { padding-inline: 16px; }
+  body:not(.admin-body) .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+  body:not(.admin-body) .product-card { min-width: 0 !important; }
+  body:not(.admin-body) .product-card * { min-width: 0; }
+  body:not(.admin-body) .product-card h3 { overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.admin-body) *,
+  body:not(.admin-body) *::before,
+  body:not(.admin-body) *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
