@@ -949,3 +949,30 @@ body:not(.admin-body) .welcome-panel {
   }
   body:not(.admin-body) .product-card .product-photo { min-height: 0; }
 }
+
+/* Slow, refractive-looking movement across the glass highlight (not a static gradient). */
+@keyframes ser-liquid-flow {
+  0%,100% { background-position: 0% 0%, 0% 50%; opacity: .38; }
+  50% { background-position: 100% 100%, 100% 50%; opacity: .72; }
+}
+body:not(.admin-body) .product-card::before,
+body:not(.admin-body) .category-card::before,
+body:not(.admin-body) .new-arrival-card::before,
+body:not(.admin-body) .welcome-panel::before {
+  background-size: 180% 180%, 240% 100% !important;
+  animation: ser-liquid-flow 9s ease-in-out infinite;
+}
+body:not(.admin-body) .product-card:nth-child(3n+2)::before,
+body:not(.admin-body) .category-card:nth-child(3n+2)::before {
+  animation-delay: -3s;
+}
+body:not(.admin-body) .product-card:nth-child(3n)::before,
+body:not(.admin-body) .category-card:nth-child(3n)::before {
+  animation-delay: -6s;
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.admin-body) .product-card::before,
+  body:not(.admin-body) .category-card::before,
+  body:not(.admin-body) .new-arrival-card::before,
+  body:not(.admin-body) .welcome-panel::before { animation: none !important; }
+}
