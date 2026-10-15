@@ -112,6 +112,41 @@ document.addEventListener('submit',async e=>{
 if(e.target.id==='checkout-form'){e.preventDefault();await submitOrder(e.target);return;}
 const form=e.target.closest('[data-message-form]');if(form){e.preventDefault();const id=Number(form.dataset.messageForm),ref=state.refs.find(r=>Number(r.id)===id),input=form.querySelector('input[name="text"]');if(!ref||!input.value.trim())return;try{await api('/api/orders/'+id+'/messages',{method:'POST',headers:{Authorization:'Bearer '+ref.token},body:JSON.stringify({text:input.value.trim()})});await loadOrders();render();notice('Message sent.');}catch(err){notice(err.message);}}
 });
+
+/* Desktop pointer tilt: visual only; never intercept clicks, typing, or touch input. */
+const finePointer = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+if (finePointer) {
+  let tiltFrame = 0;
+  let activeTiltCard = null;
+  document.addEventListener('pointermove', e => {
+    const card = e.target.closest('.product-card, .category-card');
+    if (!card) return;
+    activeTiltCard = card;
+    if (tiltFrame) return;
+    tiltFrame = requestAnimationFrame(() => {
+      tiltFrame = 0;
+      if (!activeTiltCard) return;
+      const rect = activeTiltCard.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      activeTiltCard.style.setProperty('--tilt-y', ((x - .5) * 5).toFixed(2) + 'deg');
+      activeTiltCard.style.setProperty('--tilt-x', ((.5 - y) * 4).toFixed(2) + 'deg');
+      activeTiltCard.style.setProperty('--shine-x', (x * 100).toFixed(1) + '%');
+      activeTiltCard.style.setProperty('--shine-y', (y * 100).toFixed(1) + '%');
+    });
+  }, {passive:true});
+  document.addEventListener('pointerout', e => {
+    const card = e.target.closest('.product-card, .category-card');
+    if (!card || card.contains(e.relatedTarget)) return;
+    card.style.setProperty('--tilt-x', '0deg');
+    card.style.setProperty('--tilt-y', '0deg');
+    card.style.setProperty('--shine-x', '18%');
+    card.style.setProperty('--shine-y', '0%');
+    if (activeTiltCard === card) activeTiltCard = null;
+  }, {passive:true});
+}
+
 document.addEventListener('keydown',e=>{if(e.key==='Escape')overlay.innerHTML='';});
 async function initStore(){try{$('#cart-count').textContent=String(cartCount());await loadProducts();await loadCategories();render();if(state.refs.length){await loadOrders();if(state.tab==='orders')render();}}catch(err){view.innerHTML='<section class="store-error-state"><span class="eyebrow">SER MART</span><h1>We couldn’t open the store.</h1><p>Please check your connection and try again.</p><button class="primary-button compact" type="button" data-retry-store>Try again</button><a href="/seller">Seller sign in</a></section>';}}document.addEventListener('click',e=>{if(e.target.closest('[data-retry-store]'))try{localStorage.removeItem('ser-mart-profile');}catch(_){}initStore();});initStore();
 })();
