@@ -745,3 +745,36 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, s
   .bottom-nav .nav-item { min-height: 42px !important; padding: 3px 2px !important; gap: 2px !important; border-radius: 14px !important; font-size: 9px !important; }
   .bottom-nav .nav-item svg { width: 17px !important; height: 17px !important; }
 }
+/* Mobile-first buyer layout: single-column flows on phone-sized screens. */
+@media (max-width: 760px) {
+  body:not(.admin-body) .app-shell { padding-bottom: calc(74px + var(--safe-bottom)) !important; }
+  body:not(.admin-body) .topbar { max-width: none !important; padding: 12px 16px 8px !important; }
+  body:not(.admin-body) .wordmark { font-size: 20px !important; }
+  body:not(.admin-body) .main-view { width: calc(100% - 28px) !important; max-width: none !important; padding: 8px 0 28px !important; }
+  body:not(.admin-body) .checkout-layout,
+  body:not(.admin-body) .cart-layout,
+  body:not(.admin-body) .detail-info-grid { display: grid !important; grid-template-columns: minmax(0,1fr) !important; gap: 16px !important; }
+  body:not(.admin-body) .checkout-layout > *,
+  body:not(.admin-body) .cart-layout > *,
+  body:not(.admin-body) .checkout-summary,
+  body:not(.admin-body) .cart-summary { width: 100% !important; min-width: 0 !important; max-width: none !important; }
+  body:not(.admin-body) .form-panel { width: 100% !important; min-width: 0 !important; padding: 16px !important; gap: 16px !important; }
+  body:not(.admin-body) .form-panel label { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 8px !important; width: 100% !important; min-width: 0 !important; }
+  body:not(.admin-body) .form-panel input:not([type=radio]):not([type=checkbox]),
+  body:not(.admin-body) .form-panel textarea,
+  body:not(.admin-body) .form-panel select { display: block !important; width: 100% !important; min-width: 0 !important; max-width: 100% !important; min-height: 48px !important; margin: 0 !important; font-size: 16px !important; line-height: 1.35 !important; opacity: 1 !important; pointer-events: auto !important; }
+  body:not(.admin-body) .form-panel textarea { min-height: 94px !important; resize: vertical !important; }
+  body:not(.admin-body) .payment-options { min-width: 0 !important; padding: 12px !important; }
+  body:not(.admin-body) .payment-choice { display: flex !important; flex-direction: row !important; align-items: center !important; }
+  body:not(.admin-body) .checkout-order-bar,
+  body:not(.admin-body) .cart-order-bar { left: 12px !important; right: 12px !important; bottom: calc(62px + var(--safe-bottom)) !important; width: auto !important; max-width: none !important; }
+  body:not(.admin-body) .page-heading h1 { font-size: clamp(30px, 9vw, 42px) !important; letter-spacing: -1.5px !important; }
+  body:not(.admin-body) .welcome-panel { min-height: 0 !important; padding: 26px 22px !important; border-radius: 26px !important; }
+  body:not(.admin-body) .orders-list { display: grid !important; grid-template-columns: minmax(0,1fr) !important; gap: 14px !important; }
+  body:not(.admin-body) .order-card { min-width: 0 !important; padding: 16px !important; border-radius: 22px !important; overflow-wrap: anywhere !important; }
+}
+@media (min-width: 761px) {
+  body:not(.admin-body) .app-shell,
+  body:not(.admin-body) .main-view { width: 100% !important; max-width: 100% !important; }
+  body:not(.admin-body) .main-view { padding-left: 16px !important; padding-right: 16px !important; }
+}
