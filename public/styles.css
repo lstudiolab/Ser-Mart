@@ -804,7 +804,7 @@ input, textarea, select, [contenteditable="true"] {
   user-select: text !important;
   -webkit-appearance: none;
   appearance: none;
-  -webkit-transform: translateZ(0);
+  -webkit-transform: none !important;
   transform: none !important;
   caret-color: #1d1d1f !important;
 }
@@ -824,3 +824,13 @@ textarea, select {
   #view, .main-view, .app-shell { transform: none !important; }
   .bottom-nav, .checkout-order-bar { transition: none !important; }
 }
+
+/* Keep the iOS software keyboard stable while editing checkout fields. */
+#checkout-form input:not([type=radio]), #checkout-form textarea {
+  -webkit-transform: none !important;
+  transform: none !important;
+  touch-action: manipulation;
+  scroll-margin-bottom: 140px;
+}
+.payment-choice { -webkit-tap-highlight-color: transparent; }
+.payment-choice.is-selected { border-color: #1d1d1f !important; background: #f5f5f7 !important; }
